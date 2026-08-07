@@ -110,11 +110,16 @@ else:
         wh_filter = st.selectbox("🏬 창고 필터", ["전체"] + warehouses)
 
         if wh_filter == "전체":
+            total_qty = run_query("SELECT SUM(quantity) as v FROM inventory;")[0]['v'] or 0
+            total_amt = run_query("SELECT SUM(quantity * purchase_price) as v FROM inventory;")[0]['v'] or 0
+            month_in = run_query("SELECT SUM(quantity) as v FROM stock_movements WHERE movement_type=%s AND TO_CHAR(movement_date, 'YYYY-MM')=%s;", ('IN', current_month))[0]['v'] or 0
+            month_out = run_query("SELECT SUM(quantity) as v FROM stock_movements WHERE movement_type=%s AND TO_CHAR(movement_date, 'YYYY-MM')=%s;", ('OUT', current_month))[0]['v'] or 0
+
             k1, k2, k3, k4 = st.columns(4)
-            k1.metric("총 재고 수량", f"{run_query('SELECT SUM(quantity) as v FROM inventory;')[0]['v'] or 0:,} 개")
-            k2.metric("총 재고 금액(￥)", f"￥{run_query('SELECT SUM(quantity * purchase_price) as v FROM inventory;')[0]['v'] or 0:,.0f}")
-            k3.metric("이번달 총 입고", f"{run_query('SELECT SUM(quantity) as v FROM stock_movements WHERE movement_type=''IN'' AND TO_CHAR(movement_date, ''YYYY-MM'')=%s;', (current_month,))[0]['v'] or 0:,} 개")
-            k4.metric("이번달 총 출고", f"{run_query('SELECT SUM(quantity) as v FROM stock_movements WHERE movement_type=''OUT'' AND TO_CHAR(movement_date, ''YYYY-MM'')=%s;', (current_month,))[0]['v'] or 0:,} 개")
+            k1.metric("총 재고 수량", f"{total_qty:,} 개")
+            k2.metric("총 재고 금액(￥)", f"￥{total_amt:,.0f}")
+            k3.metric("이번달 총 입고", f"{month_in:,} 개")
+            k4.metric("이번달 총 출고", f"{month_out:,} 개")
 
             st.subheader("📋 제품 통합 재고")
             df = run_query("SELECT item_name, jan_code, SUM(quantity) as qty, AVG(purchase_price) as avg_p, SUM(quantity * purchase_price) as tot FROM inventory GROUP BY item_name, jan_code ORDER BY item_name;")
