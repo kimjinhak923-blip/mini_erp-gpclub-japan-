@@ -132,10 +132,10 @@ else:
     # --- 2) 취급 제품 마스터 관리 ---
     elif menu == "📦 취급 제품 마스터" and role != "guest":
         st.subheader("➕ 신규 취급 제품 등록")
-        mc1, mc2, mc3, mc4 = st.columns(4)
-        m_name = mc2.text_input("제품명*")
-        m_jan = mc3.text_input("JAN 코드")
-        m_price = mc4.number_input("기본 매입단가(￥)", value=0.0)
+        mc1, mc2, mc3, = st.columns(3)
+        m_name = mc1.text_input("제품명*")
+        m_jan = mc2.text_input("JAN 코드")
+        m_price = mc3.number_input("기본 매입단가(￥)", value=0.0)
 
         if st.button("제품 등록", type="primary"):
             if m_code and m_name:
