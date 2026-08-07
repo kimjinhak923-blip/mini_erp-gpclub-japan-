@@ -31,16 +31,16 @@ T = {
         # 메뉴명
         "m_dash": "📊 대시보드 & 잔여재고",
         "m_prod": "📦 취급 제품 마스터",
-        "m_in": "📥 입고 등록(원화)",
-        "m_out": "📤 출고 등록(엔화)",
+        "m_in": "📥 입고 등록 (원화 ₩)",
+        "m_out": "📤 출고 등록 (납품/FOC/샘플)",
         "m_history": "📋 기간별 입출고 이력",
-        "m_cust": "🏢 거래처 & 단가 관리(엔화)",
+        "m_cust": "🏢 거래처 & 납품단가(엔화 ￥)",
         "m_rate": "🔱 월별 환율 설정",
         "m_user": "👥 계정 관리",
 
         # 환율 설정
         "rate_title": "🔱 월별 기준 환율 설정 (KRW / JPY)",
-        "rate_desc": "매입(원화 ₩)과 매출(엔화 ￥) 간 환산에 사용되는 연월별 기준 환율을 관리합니다.",
+        "rate_desc": "한국 매입(원화 ₩)과 일본 매출/비용(엔화 ￥) 간 환산에 사용되는 연월별 기준 환율을 관리합니다.",
         "target_ym": "적용 연-월 (YYYY-MM)",
         "rate_input": "100엔당 원화 환율(₩)",
         "rate_save": "환율 저장",
@@ -50,9 +50,9 @@ T = {
         "wh_filter": "🏬 창고 필터",
         "rate_info": "💡 적용 환율 ({ym}): 100엔 = {rate_100:,.1f}원 (1엔 = {rate_1:,.2f}원)",
         "tot_qty": "총 재고 수량",
-        "tot_krw": "총 재고 원가(원화)",
+        "tot_krw": "총 재고 원가(원화 ₩)",
         "month_in": "당월 총 입고 수량",
-        "month_out": "당월 총 매출액(엔화)",
+        "month_out": "당월 총 매출액(엔화 ￥)",
         "prod_stock_list": "📋 제품 통합 재고 현황",
         "wh_detail": "🏬 {wh} 창고 상세 (LOT별)",
 
@@ -80,9 +80,9 @@ T = {
         "sel_edit_prod": "수정 또는 삭제할 제품을 선택하세요",
 
         # 입고
-        "in_title": "📥 입고 정보 입력 (매입단가: 원화 ₩)",
+        "in_title": "📥 입고 정보 입력 (한국 매입: 원화 ₩)",
         "in_date": "입고 일자*",
-        "in_type": "매입/제공 유형*",
+        "in_type": "입고 구분*",
         "sel_master": "취급 제품 선택 (선택 시 자동입력)",
         "direct_input": "직접 입력",
         "lot_no": "LOT 번호*",
@@ -92,13 +92,16 @@ T = {
         "btn_in_confirm": "입고 확정",
 
         # 출고
+        "out_title": "📤 출고 등록 (일본 판매/제공)",
         "out_date": "출고 일자*",
-        "out_type": "출고 세부 유형*",
+        "out_category": "출고 구분*",
         "out_wh": "출고 창고*",
-        "cust_name": "발주 거래처*",
+        "cust_name": "발주 거래처 / 수령처*",
         "sel_item": "품목*",
         "sel_lot": "LOT*",
-        "out_qty": "수량*",
+        "out_qty": "출고 수량*",
+        "out_unit_price": "적용 단가",
+        "foc_notice": "💡 FOC/샘플건은 매출 단가 ￥0으로 처리되며, 원가(원화 ₩{cost:,.0f})로 이력이 집계됩니다.",
         "sec_ship": "🚚 배송 및 추가 정보",
         "po_num": "발주 번호",
         "del_place": "납품처명",
@@ -135,18 +138,18 @@ T = {
         "lang_label": "🌐 言語選択 / Language",
 
         # 메뉴명
-        "m_dash": "📊 ダッシュボード & 在고",
+        "m_dash": "📊 ダッシュボード & 在庫",
         "m_prod": "📦 取扱商品マスター",
-        "m_in": "📥 入庫登録(ウォン ₩)",
-        "m_out": "📤 出庫등록(円 ￥)",
+        "m_in": "📥 入庫登録 (ウォン ₩)",
+        "m_out": "📤 出庫登録 (納品/FOC/サンプル)",
         "m_history": "📋 期間別入出庫履歴",
-        "m_cust": "🏢 取引先 & 単価管理(円)",
+        "m_cust": "🏢 取引先 & 納品単価(円 ￥)",
         "m_rate": "🔱 月別為替レート設定",
         "m_user": "👥 アカウント管理",
 
         # 환율 설정
         "rate_title": "🔱 月別基準為替レート設定 (KRW / JPY)",
-        "rate_desc": "仕입(ウォン ₩)と売上(円 ￥)の換算に使用される年月別の基準レートを管理します。",
+        "rate_desc": "韓国仕入(ウォン ₩)と日本売上/費用(円 ￥)の換算に使用される年月別の基準レートを管理します。",
         "target_ym": "適用年月 (YYYY-MM)",
         "rate_input": "100円あたりのウォンレート(₩)",
         "rate_save": "レート保存",
@@ -156,9 +159,9 @@ T = {
         "wh_filter": "🏬 倉庫フィルター",
         "rate_info": "💡 適用レート ({ym}): 100円 = {rate_100:,.1f}ウォン (1円 = {rate_1:,.2f}ウォン)",
         "tot_qty": "総在庫数量",
-        "tot_krw": "総在庫原価(ウォン)",
-        "month_in": "당월 総入庫数量",
-        "month_out": "당월 総売上高(円)",
+        "tot_krw": "総在庫原価(ウォン ₩)",
+        "month_in": "当月 総入庫数量",
+        "month_out": "当月 総売上高(円 ￥)",
         "prod_stock_list": "📋 商品統合在庫現況",
         "wh_detail": "🏬 {wh} 倉庫詳細 (LOT別)",
 
@@ -186,9 +189,9 @@ T = {
         "sel_edit_prod": "修正または削除する商品を選択してください",
 
         # 입고
-        "in_title": "📥 入庫情報入力 (仕入単価: ウォン ₩)",
+        "in_title": "📥 入庫情報入力 (韓国仕入: ウォン ₩)",
         "in_date": "入庫日*",
-        "in_type": "仕入/提供区分*",
+        "in_type": "入庫区分*",
         "sel_master": "取扱商品選択 (選択時自動入力)",
         "direct_input": "Direct Input / 直接入力",
         "lot_no": "LOT番号*",
@@ -198,13 +201,16 @@ T = {
         "btn_in_confirm": "入庫確定",
 
         # 출고
+        "out_title": "📤 出庫登録 (日本販売/提供)",
         "out_date": "出荷日*",
-        "out_type": "出荷詳細区分*",
+        "out_category": "出荷区分*",
         "out_wh": "出荷倉庫*",
-        "cust_name": "発注取引先*",
+        "cust_name": "発注取引先 / 受領先*",
         "sel_item": "品目*",
         "sel_lot": "LOT*",
-        "out_qty": "数量*",
+        "out_qty": "出荷数量*",
+        "out_unit_price": "適用単価",
+        "foc_notice": "💡 FOC/サンプルは売上単価 ￥0として処理され、原価(ウォン ₩{cost:,.0f})で履歴が集計されます。",
         "sec_ship": "🚚 配送及び追加情報",
         "po_num": "発注番号",
         "del_place": "納品先名",
@@ -212,7 +218,7 @@ T = {
         "zip_code": "郵便番号",
         "del_addr": "詳細住所",
         "ship_fee": "送料(円/JPY ￥)",
-        "btn_out_confirm": "出荷確定および在庫減산",
+        "btn_out_confirm": "出荷確定および在庫減算",
 
         # 거래처
         "add_cust_title": "➕ 新規取引先追加",
@@ -243,16 +249,16 @@ T = {
         # 메뉴명
         "m_dash": "📊 Dashboard & Inventory",
         "m_prod": "📦 Product Master",
-        "m_in": "📥 Inbound Entry (KRW)",
-        "m_out": "📤 Outbound Entry (JPY)",
+        "m_in": "📥 Inbound Entry (KRW ₩)",
+        "m_out": "📤 Outbound Entry (Sales/FOC/Sample)",
         "m_history": "📋 History Logs",
-        "m_cust": "🏢 Customer & Price (JPY)",
+        "m_cust": "🏢 Customer & Price (JPY ￥)",
         "m_rate": "🔱 Monthly Exchange Rates",
         "m_user": "👥 User Management",
 
         # 환율 설정
         "rate_title": "🔱 Monthly Exchange Rate Settings (KRW / JPY)",
-        "rate_desc": "Manage conversion exchange rates between Purchase (KRW) and Sales (JPY).",
+        "rate_desc": "Manage conversion exchange rates between Purchase in Korea (KRW ₩) and Sales in Japan (JPY ￥).",
         "target_ym": "Target Month (YYYY-MM)",
         "rate_input": "KRW Rate per 100 JPY (₩)",
         "rate_save": "Save Exchange Rate",
@@ -262,9 +268,9 @@ T = {
         "wh_filter": "🏬 Warehouse Filter",
         "rate_info": "💡 Exchange Rate ({ym}): 100 JPY = {rate_100:,.1f} KRW (1 JPY = {rate_1:,.2f} KRW)",
         "tot_qty": "Total Stock Qty",
-        "tot_krw": "Total Cost (KRW)",
+        "tot_krw": "Total Cost (KRW ₩)",
         "month_in": "Monthly Inbound Qty",
-        "month_out": "Monthly Sales (JPY)",
+        "month_out": "Monthly Sales (JPY ￥)",
         "prod_stock_list": "📋 Consolidated Inventory Status",
         "wh_detail": "🏬 {wh} Warehouse Details (by LOT)",
 
@@ -292,9 +298,9 @@ T = {
         "sel_edit_prod": "Select product to edit or delete",
 
         # 입고
-        "in_title": "📥 Inbound Registration (Cost: KRW ₩)",
+        "in_title": "📥 Inbound Registration (Korea Purchase: KRW ₩)",
         "in_date": "Inbound Date*",
-        "in_type": "Transaction Type*",
+        "in_type": "Inbound Category*",
         "sel_master": "Select Product (Auto-fill)",
         "direct_input": "Direct Input",
         "lot_no": "LOT Number*",
@@ -304,13 +310,16 @@ T = {
         "btn_in_confirm": "Confirm Inbound",
 
         # 출고
+        "out_title": "📤 Outbound Registration (Japan Sales/Provide)",
         "out_date": "Outbound Date*",
-        "out_type": "Outbound Sub-type*",
+        "out_category": "Outbound Category*",
         "out_wh": "Source Warehouse*",
-        "cust_name": "Customer*",
+        "cust_name": "Customer / Recipient*",
         "sel_item": "Item*",
         "sel_lot": "LOT*",
         "out_qty": "Quantity*",
+        "out_unit_price": "Applied Price",
+        "foc_notice": "💡 FOC/Sample items are billed at ￥0 sales, tracked by cost price (KRW ₩{cost:,.0f}).",
         "sec_ship": "🚚 Shipping Details",
         "po_num": "PO Number",
         "del_place": "Delivery Place Name",
@@ -400,9 +409,8 @@ if "logged_in" not in st.session_state:
     st.session_state.update({"logged_in": False, "username": "", "role": "guest"})
 
 if "lang" not in st.session_state:
-    st.session_state["lang"] = "ko" # 기본 언어: 한국어
+    st.session_state["lang"] = "ko"
 
-# 사이드바 언어 선택기
 lang_map = {"한국어 🇰🇷": "ko", "日本語 🇯🇵": "ja", "English 🇺🇸": "en"}
 selected_lang_label = st.sidebar.selectbox(
     "🌐 Language / 언어",
@@ -410,7 +418,7 @@ selected_lang_label = st.sidebar.selectbox(
     index=list(lang_map.values()).index(st.session_state["lang"])
 )
 st.session_state["lang"] = lang_map[selected_lang_label]
-L = T[st.session_state["lang"]] # 현재 언어 번역 딕셔너리 숏컷
+L = T[st.session_state["lang"]]
 
 # --- 5. 로그인 및 회원가입 화면 ---
 if not st.session_state["logged_in"]:
@@ -439,8 +447,6 @@ if not st.session_state["logged_in"]:
                     st.warning(L["signup_exists"])
                 elif run_commit("INSERT INTO users (username, password, name, role, status) VALUES (%s, %s, %s, %s, 'pending');", (new_user, new_pass, new_name, req_role)):
                     st.success(L["signup_success"])
-            else:
-                st.warning("All fields are required.")
 
 # --- 6. 메인 ERP 화면 ---
 else:
@@ -463,8 +469,6 @@ else:
         
     menu_labels = [m[1] for m in menu_keys]
     selected_menu_label = st.sidebar.radio("Menu", menu_labels)
-    
-    # 선택된 메뉴 키 매핑
     selected_menu_key = [m[0] for m in menu_keys if m[1] == selected_menu_label][0]
 
     if st.sidebar.button(L["logout"]):
@@ -518,7 +522,7 @@ else:
             total_amt_jpy = total_amt_krw / applied_rate if applied_rate > 0 else 0
 
             month_in = run_query("SELECT SUM(quantity) as v FROM stock_movements WHERE movement_type='IN' AND TO_CHAR(movement_date, 'YYYY-MM')=%s;", (selected_ym,))[0]['v'] or 0
-            month_out_jpy = run_query("SELECT SUM(total_amount) as v FROM stock_movements WHERE movement_type='OUT' AND TO_CHAR(movement_date, 'YYYY-MM')=%s;", (selected_ym,))[0]['v'] or 0
+            month_out_jpy = run_query("SELECT SUM(total_amount) as v FROM stock_movements WHERE movement_type='OUT' AND transaction_type='납품(유상)' AND TO_CHAR(movement_date, 'YYYY-MM')=%s;", (selected_ym,))[0]['v'] or 0
 
             k1, k2, k3, k4 = st.columns(4)
             k1.metric(L["tot_qty"], f"{total_qty:,}")
@@ -696,7 +700,7 @@ else:
         if master_list:
             st.dataframe(pd.DataFrame(master_list), use_container_width=True)
 
-    # --- 📥 입고 등록 (원화) ---
+    # --- 📥 입고 등록 (한국 매입: 원화 ₩) ---
     elif selected_menu_key == "m_in" and role != "guest":
         master_products = run_query("SELECT item_code, item_name, jan_box, default_purchase_price FROM master_products ORDER BY item_name;")
         prod_options = {f"{p['item_name']} [{p['item_code']}]": p for p in master_products} if master_products else {}
@@ -705,7 +709,7 @@ else:
         col1, col2, col3 = st.columns(3)
         with col1:
             in_date = st.date_input(L["in_date"], datetime.today())
-            in_type = st.selectbox(L["in_type"], ["매입/발주납품", "FOC무료제공"])
+            in_type = st.selectbox(L["in_type"], ["매입입고", "기타입고"])
             
             selected_master = st.selectbox(L["sel_master"], [L["direct_input"]] + list(prod_options.keys()))
             if selected_master != L["direct_input"]:
@@ -725,7 +729,7 @@ else:
             in_wh = st.selectbox(L["warehouse"], warehouses)
         with col3:
             in_qty = st.number_input(L["in_qty"], min_value=1)
-            in_price = st.number_input(L["in_price"], value=0.0 if in_type == "FOC무료제공" else default_price)
+            in_price = st.number_input(L["in_price"], value=default_price)
 
         if st.button(L["btn_in_confirm"], type="primary"):
             if in_code and in_name and in_lot:
@@ -738,29 +742,63 @@ else:
                 st.success("Confirmed.")
                 st.rerun()
 
-    # --- 📤 출고 등록 (엔화) ---
+    # --- 📤 출고 등록 (납품 / FOC / 샘플) ---
     elif selected_menu_key == "m_out" and role != "guest":
-        c1, c2, c3, c4 = st.columns(4)
+        st.subheader(L["out_title"])
+        c1, c2, c3 = st.columns(3)
         out_date = c1.date_input(L["out_date"], datetime.today())
-        out_trans = c2.selectbox(L["in_type"], ["발주납품", "FOC무료제공"])
-        out_type = c3.selectbox(L["out_type"], ["발주", "샘플발송"])
-        out_wh = c4.selectbox(L["out_wh"], warehouses)
+        
+        # 출고 구분 선택: 납품(유상), FOC(무상), 샘플발송
+        out_trans = c2.selectbox(L["out_category"], ["납품(유상)", "FOC(무상)", "샘플발송"])
+        out_wh = c3.selectbox(L["out_wh"], warehouses)
 
         cust_list = [c['customer_name'] for c in run_query("SELECT customer_name FROM customers;")]
         selected_cust = st.selectbox(L["cust_name"], cust_list) if cust_list else None
         
         if selected_cust:
-            items = {f"{i['item_name']} (￥{i['delivery_price']})": i for i in run_query("SELECT * FROM customer_prices WHERE customer_name=%s;", (selected_cust,))}
-            sel_item = items.get(st.selectbox(L["sel_item"], list(items.keys()))) if items else None
+            # 해당 거래처에 등록된 품목들 가져오기
+            cust_items = run_query("SELECT * FROM customer_prices WHERE customer_name=%s;", (selected_cust,))
             
+            # 거래처 품목이 없더라도 제품 마스터 전체에서 선택 가능하도록 지원
+            if cust_items:
+                items_map = {f"{i['item_name']} [코드:{i['item_code']}] (납품단가: ￥{i['delivery_price']})": i for i in cust_items}
+                selected_item_label = st.selectbox(L["sel_item"], list(items_map.keys()))
+                sel_item = items_map[selected_item_label]
+                item_code = sel_item['item_code']
+                item_name = sel_item['item_name']
+                cust_jpy_price = float(sel_item['delivery_price'])
+            else:
+                all_p = run_query("SELECT item_code, item_name, default_purchase_price FROM master_products ORDER BY item_name;")
+                items_map = {f"{i['item_name']} [{i['item_code']}]": i for i in all_p} if all_p else {}
+                selected_item_label = st.selectbox(L["sel_item"], list(items_map.keys())) if items_map else None
+                if selected_item_label:
+                    sel_item = items_map[selected_item_label]
+                    item_code = sel_item['item_code']
+                    item_name = sel_item['item_name']
+                    cust_jpy_price = 0.0
+                else:
+                    sel_item = None
+
             if sel_item:
-                lots = {f"LOT: {l['lot_no']} (Qty:{l['quantity']})": l for l in run_query("SELECT * FROM inventory WHERE item_code=%s AND warehouse=%s AND quantity>0;", (sel_item['item_code'], out_wh))}
-                sel_lot = lots.get(st.selectbox(L["sel_lot"], list(lots.keys()))) if lots else None
+                # 선택한 품목의 해당 창고 LOT 재고 목록
+                lots = {f"LOT: {l['lot_no']} (잔여재고: {l['quantity']}개, 매입단가: ₩{l['purchase_price']:,.0f})": l for l in run_query("SELECT * FROM inventory WHERE item_code=%s AND warehouse=%s AND quantity>0;", (item_code, out_wh))}
                 
-                if sel_lot:
+                if lots:
+                    sel_lot = lots[st.selectbox(L["sel_lot"], list(lots.keys()))]
                     out_qty = st.number_input(L["out_qty"], min_value=1, max_value=sel_lot['quantity'])
-                    price_jpy = 0 if out_trans == "FOC무료제공" else float(sel_item['delivery_price'])
                     
+                    # --- 단가 및 매출 로직 적용 ---
+                    cost_krw = float(sel_lot['purchase_price'] or 0.0) # 기본 매입 단가(원화)
+                    
+                    if out_trans == "납품(유상)":
+                        price_jpy = cust_jpy_price # 거래처 엔화 단가 적용
+                        total_amount = out_qty * price_jpy
+                        st.success(f"💰 납품 매출 단가: **￥{price_jpy:,.0f}** | 총 매출액: **￥{total_amount:,.0f}**")
+                    else:
+                        price_jpy = 0.0 # FOC / 샘플은 매출액 ￥0
+                        total_amount = 0.0
+                        st.info(L["foc_notice"].format(cost=cost_krw))
+
                     st.divider()
                     st.markdown(f"##### {L['sec_ship']}")
                     d1, d2, d3 = st.columns(3)
@@ -768,27 +806,37 @@ else:
                     del_place = d2.text_input(L["del_place"])
                     del_phone = d3.text_input(L["del_phone"])
                     
-                    z1, z2 = st.columns([1,3])
+                    z1, z2 = st.columns([1, 3])
                     zip_code = z1.text_input(L["zip_code"])
                     del_addr = z2.text_input(L["del_addr"])
                     ship_fee = st.number_input(L["ship_fee"], value=0.0)
 
                     if st.button(L["btn_out_confirm"], type="primary"):
-                        run_commit("UPDATE inventory SET quantity=%s WHERE item_code=%s AND lot_no=%s AND warehouse=%s;", (sel_lot['quantity']-out_qty, sel_item['item_code'], sel_lot['lot_no'], out_wh))
-                        run_commit("""INSERT INTO stock_movements (movement_date, movement_type, transaction_type, outbound_type, item_code, item_name, lot_no, warehouse, quantity, unit_price, total_amount, customer_name, po_number, delivery_place, zip_code, delivery_address, delivery_phone, shipping_fee) 
-                                      VALUES (%s, 'OUT', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",
-                                   (out_date, out_trans, out_type, sel_item['item_code'], sel_item['item_name'], sel_lot['lot_no'], out_wh, out_qty, price_jpy, out_qty*price_jpy, selected_cust, po_num, del_place, zip_code, del_addr, del_phone, ship_fee))
+                        # 1. 재고 차감
+                        run_commit("UPDATE inventory SET quantity=%s WHERE item_code=%s AND lot_no=%s AND warehouse=%s;", (sel_lot['quantity'] - out_qty, item_code, sel_lot['lot_no'], out_wh))
+                        
+                        # 2. 입출고 이력(stock_movements)에 기록
+                        run_commit("""INSERT INTO stock_movements (
+                                        movement_date, movement_type, transaction_type, outbound_type, 
+                                        item_code, item_name, lot_no, warehouse, quantity, 
+                                        unit_price, total_amount, customer_name, po_number, 
+                                        delivery_place, zip_code, delivery_address, delivery_phone, shipping_fee
+                                      ) VALUES (%s, 'OUT', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",
+                                   (out_date, out_trans, out_trans, item_code, item_name, sel_lot['lot_no'], out_wh, out_qty, price_jpy, total_amount, selected_cust, po_num, del_place, zip_code, del_addr, del_phone, ship_fee))
+                        
                         st.success("Confirmed.")
                         st.rerun()
+                else:
+                    st.warning("선택한 창고에 해당 상품의 출고 가능한 재고(LOT)가 없습니다.")
 
     # --- 📋 기간별 입출고 이력 ---
     elif selected_menu_key == "m_history":
         c1, c2 = st.columns(2)
         dates = c1.date_input("Period", [datetime.today() - timedelta(days=30), datetime.today()])
-        m_type = c2.selectbox("Type", ["ALL", "IN (KRW)", "OUT (JPY)"])
+        m_type = c2.selectbox("Type", ["ALL", "IN (KRW ₩)", "OUT (JPY ￥)"])
         
         if len(dates) == 2:
-            query = "SELECT movement_date, movement_type, transaction_type, outbound_type, warehouse, item_name, lot_no, quantity, unit_price, total_amount, customer_name FROM stock_movements WHERE movement_date BETWEEN %s AND %s"
+            query = "SELECT movement_date, movement_type, transaction_type, warehouse, item_name, lot_no, quantity, unit_price, total_amount, customer_name FROM stock_movements WHERE movement_date BETWEEN %s AND %s"
             params = [dates[0], dates[1]]
             if m_type != "ALL":
                 query += " AND movement_type = %s"
@@ -798,7 +846,7 @@ else:
             if df:
                 st.dataframe(pd.DataFrame(df), use_container_width=True)
 
-    # --- 🏢 거래처 & 단가 관리 (엔화) ---
+    # --- 🏢 거래처 & 납품단가 관리 (엔화 ￥) ---
     elif selected_menu_key == "m_cust" and role != "guest":
         st.subheader(L["add_cust_title"])
         new_cust = st.text_input(L["new_cust_name"])
