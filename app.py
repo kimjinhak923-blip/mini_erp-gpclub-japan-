@@ -23,7 +23,7 @@ def to_excel(df):
     processed_data = output.getvalue()
     return processed_data
 
-st.set_page_config(page_title="5인 소기업 미니 ERP", layout="wide", page_icon="💼")
+st.set_page_config(page_title="GPCLUB JAPAN", layout="wide", page_icon="✨")
 
 # 세션 상태 초기화 (로그인 정보 저장)
 if "logged_in" not in st.session_state:
@@ -34,7 +34,7 @@ if "logged_in" not in st.session_state:
 
 # --- 1. 로그인 / 로그아웃 화면 ---
 if not st.session_state.logged_in:
-    st.title("💼 소기업 미니 ERP - 로그인")
+    st.title("✨ GPCLUB JAPAN - 로그인")
     
     with st.form("login_form"):
         username = st.text_input("아이디")
@@ -82,7 +82,7 @@ else:
         
     menu = st.sidebar.radio("메뉴 선택", menu_options)
     
-    st.title("💼 5인 소기업 미니 ERP")
+    st.title("✨ GPCLUB JAPAN")
 
     # --- 2. 재고 관리 메뉴 ---
     if menu == "📦 재고 관리":
