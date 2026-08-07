@@ -131,23 +131,114 @@ else:
 
     # --- 2) 취급 제품 마스터 관리 ---
     elif menu == "📦 취급 제품 마스터" and role != "guest":
-        st.subheader("➕ 신규 취급 제품 등록")
-        mc1, mc2, mc3, = st.columns(3)
-        m_name = mc1.text_input("제품명*")
-        m_jan = mc2.text_input("JAN 코드")
-        m_price = mc3.number_input("기본 매입단가(￥)", value=0.0)
+        # DB 컬럼 자동 확장 (기존 DB 컬럼 미존재 시 자동 생성)
+        alter_cols = [
+            "jan_box VARCHAR(100)", "jan_piece VARCHAR(100)",
+            "box_in_box INT DEFAULT 0", "box_in_piece INT DEFAULT 0",
+            "prod_size_w NUMERIC DEFAULT 0", "prod_size_d NUMERIC DEFAULT 0", "prod_size_h NUMERIC DEFAULT 0",
+            "carton_size_w NUMERIC DEFAULT 0", "carton_size_d NUMERIC DEFAULT 0", "carton_size_h NUMERIC DEFAULT 0",
+            "pallet_in_box INT DEFAULT 0", "pallet_in_carton INT DEFAULT 0"
+        ]
+        for col_def in alter_cols:
+            run_commit(f"ALTER TABLE master_products ADD COLUMN IF NOT EXISTS {col_def};")
 
-        if st.button("제품 등록", type="primary"):
-            if m_code and m_name:
-                if run_commit("INSERT INTO master_products (item_code, item_name, jan_code, default_purchase_price) VALUES (%s, %s, %s, %s) ON CONFLICT (item_code) DO UPDATE SET item_name=EXCLUDED.item_name, jan_code=EXCLUDED.jan_code, default_purchase_price=EXCLUDED.default_purchase_price;", (m_code, m_name, m_jan, m_price)):
-                    st.success("제품 마스터에 성공적으로 저장되었습니다.")
-                    st.rerun()
-            else:
-                st.warning("제품 코드와 제품명은 필수 입력 항목입니다.")
+        st.subheader("➕ 취급 제품 마스터 상세 등록 / 수정")
+        
+        with st.form("master_product_form", clear_on_submit=False):
+            st.markdown("##### 📌 기본 정보")
+            c1, c2, c3 = st.columns(3)
+            m_code = c1.text_input("제품 코드* (예: PROD-001)")
+            m_name = c2.text_input("제품명*")
+            m_price = c3.number_input("기본 매입단가(￥)", value=0.0, step=10.0)
+
+            st.markdown("##### 🏷️ JAN 코드")
+            j1, j2 = st.columns(2)
+            m_jan_box = j1.text_input("JAN 코드 (곽/소박스)")
+            m_jan_piece = j2.text_input("JAN 코드 (낱장/단품)")
+
+            st.markdown("##### 📦 박스 입수량")
+            b1, b2 = st.columns(2)
+            m_box_in_box = b1.number_input("박스 당 곽 수량(개)", min_value=0, value=0)
+            m_box_in_piece = b2.number_input("박스 당 낱장 수량(개)", min_value=0, value=0)
+
+            st.markdown("##### 📐 곽(제품) 사이즈 (가로 x 세로 x 높이 mm)")
+            ps1, ps2, ps3 = st.columns(3)
+            m_ps_w = ps1.number_input("곽 가로(W)", min_value=0.0, value=0.0, step=1.0)
+            m_ps_d = ps2.number_input("곽 세로(D)", min_value=0.0, value=0.0, step=1.0)
+            m_ps_h = ps3.number_input("곽 높이(H)", min_value=0.0, value=0.0, step=1.0)
+
+            st.markdown("##### 📦 박스 사이즈 (가로 x 세로 x 높이 mm)")
+            cs1, cs2, cs3 = st.columns(3)
+            m_cs_w = cs1.number_input("박스 가로(W)", min_value=0.0, value=0.0, step=1.0)
+            m_cs_d = cs2.number_input("박스 세로(D)", min_value=0.0, value=0.0, step=1.0)
+            m_cs_h = cs3.number_input("박스 높이(H)", min_value=0.0, value=0.0, step=1.0)
+
+            st.markdown("##### 🏗️ 1파레트 입수량")
+            pl1, pl2 = st.columns(2)
+            m_pallet_box = pl1.number_input("파레트 당 곽 수량(개)", min_value=0, value=0)
+            m_pallet_carton = pl2.number_input("파레트 당 박스 수량(개)", min_value=0, value=0)
+
+            submitted = st.form_submit_button("제품 마스터 저장", type="primary", use_container_width=True)
+
+            if submitted:
+                if m_code and m_name:
+                    sql = """
+                    INSERT INTO master_products (
+                        item_code, item_name, default_purchase_price,
+                        jan_box, jan_piece,
+                        box_in_box, box_in_piece,
+                        prod_size_w, prod_size_d, prod_size_h,
+                        carton_size_w, carton_size_d, carton_size_h,
+                        pallet_in_box, pallet_in_carton
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (item_code) DO UPDATE SET
+                        item_name=EXCLUDED.item_name,
+                        default_purchase_price=EXCLUDED.default_purchase_price,
+                        jan_box=EXCLUDED.jan_box,
+                        jan_piece=EXCLUDED.jan_piece,
+                        box_in_box=EXCLUDED.box_in_box,
+                        box_in_piece=EXCLUDED.box_in_piece,
+                        prod_size_w=EXCLUDED.prod_size_w,
+                        prod_size_d=EXCLUDED.prod_size_d,
+                        prod_size_h=EXCLUDED.prod_size_h,
+                        carton_size_w=EXCLUDED.carton_size_w,
+                        carton_size_d=EXCLUDED.carton_size_d,
+                        carton_size_h=EXCLUDED.carton_size_h,
+                        pallet_in_box=EXCLUDED.pallet_in_box,
+                        pallet_in_carton=EXCLUDED.pallet_in_carton;
+                    """
+                    params = (
+                        m_code, m_name, m_price,
+                        m_jan_box, m_jan_piece,
+                        m_box_in_box, m_box_in_piece,
+                        m_ps_w, m_ps_d, m_ps_h,
+                        m_cs_w, m_cs_d, m_cs_h,
+                        m_pallet_box, m_pallet_carton
+                    )
+                    if run_commit(sql, params):
+                        st.success("취급 제품 상세 마스터 정보가 저장되었습니다.")
+                        st.rerun()
+                else:
+                    st.warning("제품 코드와 제품명은 필수 입력 항목입니다.")
 
         st.divider()
-        st.subheader("📋 취급 제품 목록")
-        master_list = run_query("SELECT item_code as 코드, item_name as 제품명, jan_code as JAN코드, default_purchase_price as 기본매입가 FROM master_products ORDER BY item_name;")
+        st.subheader("📋 취급 제품 상세 마스터 목록")
+        master_list = run_query("""
+            SELECT 
+                item_code as 코드,
+                item_name as 제품명,
+                default_purchase_price as 기본매입가,
+                jan_box as "JAN(곽)",
+                jan_piece as "JAN(낱장)",
+                box_in_box as "박스입수(곽)",
+                box_in_piece as "박스입수(낱장)",
+                CONCAT(prod_size_w, 'x', prod_size_d, 'x', prod_size_h) as "곽사이즈(W*D*H)",
+                CONCAT(carton_size_w, 'x', carton_size_d, 'x', carton_size_h) as "박스사이즈(W*D*H)",
+                pallet_in_box as "파레트입수(곽)",
+                pallet_in_carton as "파레트입수(박스)"
+            FROM master_products 
+            ORDER BY item_name;
+        """)
         if master_list:
             st.dataframe(pd.DataFrame(master_list), use_container_width=True)
 
