@@ -269,7 +269,7 @@ else:
         if custs:
             sel_c = st.selectbox("🏢 관리할 거래처 선택", custs)
             
-            st.markdown(f"#### 💰 {sel_c} 품목별 단가 설정")
+            st.markdown(f"#### ➕ {sel_c} 신규 품목 단가 등록")
             master_prods = run_query("SELECT item_code, item_name, jan_code FROM master_products ORDER BY item_name;")
             
             col_a, col_b = st.columns(2)
@@ -284,39 +284,70 @@ else:
                 p_code = col_a.text_input("품목코드*")
                 p_name = col_a.text_input("품목명*")
                 
-            p_price = col_b.number_input("납품 단가(￥)*", value=0.0)
+            p_price = col_b.number_input("납품 단가(￥)*", value=0.0, key="new_p_price")
             
-            if st.button("단가 저장 / 수정", type="primary") and p_code and p_name:
-                run_commit("INSERT INTO customer_prices (customer_name, item_code, item_name, delivery_price) VALUES (%s,%s,%s,%s) ON CONFLICT (customer_name, item_code) DO UPDATE SET delivery_price=EXCLUDED.delivery_price, item_name=EXCLUDED.item_name;", (sel_c, p_code, p_name, p_price))
-                st.success("단가가 저장/수정되었습니다.")
+            if st.button("신규 단가 등록", type="primary") and p_code and p_name:
+                run_commit(
+                    "INSERT INTO customer_prices (customer_name, item_code, item_name, delivery_price) VALUES (%s,%s,%s,%s) ON CONFLICT (customer_name, item_code) DO UPDATE SET delivery_price=EXCLUDED.delivery_price, item_name=EXCLUDED.item_name;",
+                    (sel_c, p_code, p_name, p_price)
+                )
+                st.success("신규 단가가 등록되었습니다.")
                 st.rerun()
 
             st.divider()
-            st.markdown(f"##### 📋 {sel_c} 등록된 단가 목록")
+            st.markdown(f"##### 📋 {sel_c} 등록된 품목 단가 전체 관리 (수정/삭제)")
             curr_prices = run_query("SELECT id, item_code, item_name, delivery_price FROM customer_prices WHERE customer_name=%s ORDER BY item_name;", (sel_c,))
             
             if curr_prices:
+                # 테이블 헤더 표시
+                h1, h2, h3, h4, h5 = st.columns([2.5, 3.5, 2, 1.2, 1.2])
+                h1.caption("**품목 코드**")
+                h2.caption("**품목명**")
+                h3.caption("**납품 단가(￥)**")
+                h4.caption("**수정**")
+                h5.caption("**삭제**")
+
                 for cp in curr_prices:
-                    p1, p2, p3, p4, p5 = st.columns([2, 3, 2, 2, 2])
-                    p1.write(f"**코드:** {cp['item_code']}")
-                    p2.write(f"**제품명:** {cp['item_name']}")
+                    row_id = cp['id']
+                    c_code, c_name, c_price, c_save, c_del = st.columns([2.5, 3.5, 2, 1.2, 1.2])
                     
-                    new_val = p3.number_input("단가", value=float(cp['delivery_price']), key=f"p_{cp['id']}", label_visibility="collapsed")
+                    # 코드, 품목명, 단가를 입력 폼 형태(text_input/number_input)로 각각 수정 가능
+                    edit_code = c_code.text_input("코드", value=cp['item_code'], key=f"code_{row_id}", label_visibility="collapsed")
+                    edit_name = c_name.text_input("제품명", value=cp['item_name'], key=f"name_{row_id}", label_visibility="collapsed")
+                    edit_price = c_price.number_input("단가", value=float(cp['delivery_price']), key=f"price_{row_id}", label_visibility="collapsed")
                     
-                    if p4.button("수정", key=f"edit_{cp['id']}"):
-                        run_commit("UPDATE customer_prices SET delivery_price=%s WHERE id=%s;", (new_val, cp['id']))
-                        st.success("수정 완료")
-                        st.rerun()
-                        
-                    if p5.button("삭제", key=f"del_{cp['id']}"):
-                        run_commit("DELETE FROM customer_prices WHERE id=%s;", (cp['id'],))
-                        st.warning("삭제 완료")
+                    # 수정 저장 버튼
+                    if c_save.button("수정", key=f"edit_{row_id}", use_container_width=True):
+                        if edit_code and edit_name:
+                            run_commit(
+                                "UPDATE customer_prices SET item_code=%s, item_name=%s, delivery_price=%s WHERE id=%s;",
+                                (edit_code, edit_name, edit_price, row_id)
+                            )
+                            st.success(f"[{edit_name}] 정보가 수정되었습니다.")
+                            st.rerun()
+                        else:
+                            st.warning("코드와 제품명은 빈 칸일 수 없습니다.")
+                            
+                    # 삭제 버튼
+                    if c_del.button("삭제", key=f"del_{row_id}", type="secondary", use_container_width=True):
+                        run_commit("DELETE FROM customer_prices WHERE id=%s;", (row_id,))
+                        st.warning("단가 항목이 삭제되었습니다.")
                         st.rerun()
             else:
                 st.info("등록된 단가 정보가 없습니다.")
 
     # --- 7) 계정 관리 ---
     elif menu == "👥 계정 관리" and role == "admin":
-        st.write("승인 대기")
-        for u in run_query("SELECT * FROM users WHERE status='pending';"):
-            if st.button(f"승인: {u['username']}", key=u['id']): run_commit("UPDATE users SET status='active' WHERE id=%s;", (u['id'],)); st.rerun()
+        st.subheader("👥 계정 승인 관리")
+        pending_users = run_query("SELECT username, name, role FROM users WHERE status='pending';")
+        if pending_users:
+            for u in pending_users:
+                col1, col2, col3 = st.columns([3, 2, 2])
+                col1.write(f"**아이디:** {u['username']} ({u.get('name', '이름 없음')})")
+                col2.write(f"**요청 권한:** {u.get('role', 'staff')}")
+                if col3.button("승인", key=f"approve_{u['username']}"):
+                    run_commit("UPDATE users SET status='active' WHERE username=%s;", (u['username'],))
+                    st.success(f"{u['username']} 계정이 승인되었습니다.")
+                    st.rerun()
+        else:
+            st.info("승인 대기 중인 계정이 없습니다.")
