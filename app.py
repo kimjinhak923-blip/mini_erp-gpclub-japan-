@@ -849,7 +849,7 @@ else:
             if df:
                 st.dataframe(pd.DataFrame(df), use_container_width=True)
 
-    # --- 🏢 거래처 & 납품단가 관리 (엔화 ￥) ---
+    # --- 🏢 거래처 & 납품단가 관리 ---
     elif selected_menu_key == "m_cust" and role != "guest":
         st.subheader(L["add_cust_title"])
         new_cust = st.text_input(L["new_cust_name"])
