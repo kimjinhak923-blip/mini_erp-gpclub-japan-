@@ -1,7 +1,7 @@
 import streamlit as st
 import psycopg2
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # --- 1. 페이지 기본 설정 ---
 st.set_page_config(
@@ -26,15 +26,13 @@ def get_connection():
 
 def run_query(query, params=None):
     conn = get_connection()
-    if conn is None:
-        return []
+    if conn is None: return []
     try:
         with conn.cursor() as cur:
             cur.execute(query, params)
             if cur.description:
                 columns = [desc[0] for desc in cur.description]
-                results = [dict(zip(columns, row)) for row in cur.fetchall()]
-                return results
+                return [dict(zip(columns, row)) for row in cur.fetchall()]
             return []
     except Exception as e:
         st.error(f"쿼리 실행 오류: {e}")
@@ -44,8 +42,7 @@ def run_query(query, params=None):
 
 def run_commit(query, params=None):
     conn = get_connection()
-    if conn is None:
-        return False
+    if conn is None: return False
     try:
         with conn.cursor() as cur:
             cur.execute(query, params)
@@ -59,11 +56,7 @@ def run_commit(query, params=None):
 
 # --- 3. 세션 상태 초기화 ---
 if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-if "username" not in st.session_state:
-    st.session_state["username"] = ""
-if "role" not in st.session_state:
-    st.session_state["role"] = "guest"
+    st.session_state.update({"logged_in": False, "username": "", "role": "guest"})
 
 # --- 4. 로그인 및 회원가입 화면 ---
 if not st.session_state["logged_in"]:
@@ -73,392 +66,171 @@ if not st.session_state["logged_in"]:
     with tab1:
         username_input = st.text_input("아이디")
         password_input = st.text_input("비밀번호", type="password")
-        
         if st.button("로그인", use_container_width=True):
-            user = run_query(
-                "SELECT * FROM users WHERE username=%s AND password=%s AND status='active';",
-                (username_input, password_input)
-            )
+            user = run_query("SELECT * FROM users WHERE username=%s AND password=%s AND status='active';", (username_input, password_input))
             if user:
-                st.session_state["logged_in"] = True
-                st.session_state["username"] = user[0]['username']
-                st.session_state["role"] = user[0].get('role', 'staff')
-                role_korean = {"admin": "관리자", "staff": "사원", "guest": "방문자"}.get(st.session_state["role"], "방문자")
-                st.success(f"환영합니다, {user[0]['username']}님! [{role_korean}] 권한으로 로그인되었습니다.")
+                st.session_state.update({"logged_in": True, "username": user[0]['username'], "role": user[0].get('role', 'staff')})
                 st.rerun()
             else:
                 st.error("아이디/비밀번호가 올바르지 않거나 승인 대기 중인 계정입니다.")
 
     with tab2:
-        st.subheader("신규 계정 가입 신청")
         new_user = st.text_input("신청 아이디")
         new_pass = st.text_input("신청 비밀번호", type="password")
         new_name = st.text_input("이름")
-        role_map = {"사원": "staff", "관리자": "admin", "방문자": "guest"}
-        selected_role_label = st.selectbox("요청 권한", ["사원", "관리자", "방문자"])
-        req_role = role_map[selected_role_label]
-        
-        if st.button("가입 신청 제출", use_container_width=True):
+        req_role = {"사원": "staff", "관리자": "admin", "방문자": "guest"}[st.selectbox("요청 권한", ["사원", "관리자", "방문자"])]
+        if st.button("가입 신청 제출"):
             if new_user and new_pass:
-                existing = run_query("SELECT * FROM users WHERE username=%s;", (new_user,))
-                if existing:
+                if run_query("SELECT * FROM users WHERE username=%s;", (new_user,)):
                     st.warning("이미 존재하는 아이디입니다.")
-                else:
-                    success = run_commit(
-                        "INSERT INTO users (username, password, name, role, status) VALUES (%s, %s, %s, %s, 'pending');",
-                        (new_user, new_pass, new_name, req_role)
-                    )
-                    if success:
-                        st.success("가입 신청이 완료되었습니다. 관리자 승인 후 로그인할 수 있습니다.")
+                elif run_commit("INSERT INTO users (username, password, name, role, status) VALUES (%s, %s, %s, %s, 'pending');", (new_user, new_pass, new_name, req_role)):
+                    st.success("가입 신청 완료.")
             else:
-                st.warning("아이디와 비밀번호를 입력해주세요.")
+                st.warning("아이디/비밀번호를 입력하세요.")
 
-# --- 5. 메인 ERP 화면 (로그인 성공 시) ---
+# --- 5. 메인 ERP 화면 ---
 else:
     role = st.session_state["role"]
-    role_korean = {"admin": "관리자", "staff": "사원", "guest": "방문자"}.get(role, "방문자")
     warehouses = ["SAGAWA", "L&K", "大吉商事"]
     
-    # 사이드바 Navigation
     st.sidebar.title("✨ GPCLUB JAPAN")
-    st.sidebar.write(f"접속자: **{st.session_state['username']}** ({role_korean})")
-    
-    menu_options = ["📊 대시보드 & 잔여재고", "📥 입고 등록", "📤 출고 등록", "🏢 거래처 & 단가 관리"]
-    if role == "admin":
-        menu_options.append("👥 계정 승인 및 관리")
-        
+    menu_options = ["📊 대시보드 & 잔여재고", "📥 입고 등록", "📤 출고 등록", "📋 기간별 입출고 이력", "🏢 거래처 & 단가 관리"]
+    if role == "admin": menu_options.append("👥 계정 관리")
     menu = st.sidebar.radio("메뉴 선택", menu_options)
     
     if st.sidebar.button("로그아웃"):
-        st.session_state["logged_in"] = False
-        st.session_state["username"] = ""
-        st.session_state["role"] = "guest"
+        st.session_state.update({"logged_in": False, "username": "", "role": "guest"})
         st.rerun()
 
     st.title(f"✨ GPCLUB JAPAN ERP - {menu}")
 
-    # --------------------------------------------------
-    # 1) 대시보드 & 잔여재고
-    # --------------------------------------------------
+    # --- 1) 대시보드 ---
     if menu == "📊 대시보드 & 잔여재고":
         current_month = datetime.now().strftime('%Y-%m')
-        wh_filter = st.selectbox("🏬 창고 선택 필터", ["전체 (통합 대시보드)"] + warehouses)
+        wh_filter = st.selectbox("🏬 창고 필터", ["전체"] + warehouses)
 
-        if wh_filter == "전체 (통합 대시보드)":
-            st.subheader("🌐 전체 창고 통합 요약")
-            
-            # KPI 지표 계산
-            total_stock_qty = run_query("SELECT SUM(quantity) as val FROM inventory;")[0]['val'] or 0
-            total_stock_val = run_query("SELECT SUM(quantity * purchase_price) as val FROM inventory;")[0]['val'] or 0
-            month_in_qty = run_query(
-                "SELECT SUM(quantity) as val FROM stock_movements WHERE movement_type='IN' AND TO_CHAR(created_at, 'YYYY-MM')=%s;",
-                (current_month,)
-            )[0]['val'] or 0
-            month_out_qty = run_query(
-                "SELECT SUM(quantity) as val FROM stock_movements WHERE movement_type='OUT' AND TO_CHAR(created_at, 'YYYY-MM')=%s;",
-                (current_month,)
-            )[0]['val'] or 0
-
-            kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-            kpi1.metric("📦 총 재고 수량", f"{total_stock_qty:,} 개")
-            kpi2.metric("💰 총 재고 금액 (매입가)", f"￥{total_stock_val:,.0f}")
-            kpi3.metric("📥 이번달 총 입고량", f"{month_in_qty:,} 개")
-            kpi4.metric("📤 이번달 총 출고량", f"{month_out_qty:,} 개")
-
-            st.divider()
-            st.subheader("📋 상품명별 통합 묶음 재고 현황")
-            grouped_data = run_query("""
-                SELECT item_name, jan_code, SUM(quantity) as total_qty, 
-                       ROUND(AVG(purchase_price), 2) as avg_purchase_price,
-                       SUM(quantity * purchase_price) as total_val
-                FROM inventory
-                GROUP BY item_name, jan_code
-                ORDER BY item_name;
-            """)
-            if grouped_data:
-                df_grouped = pd.DataFrame(grouped_data)
-                df_grouped.columns = ["제품명", "JAN 코드", "총 재고수량", "평균 매입단가(￥)", "총 재고금액(￥)"]
-                st.dataframe(df_grouped, use_container_width=True)
-            else:
-                st.info("등록된 재고 데이터가 없습니다.")
-
-        else: # 개별 창고 선택 시
-            st.subheader(f"🏬 [{wh_filter}] 창고 현황")
-            wh_stock_qty = run_query("SELECT SUM(quantity) as val FROM inventory WHERE warehouse=%s;", (wh_filter,))[0]['val'] or 0
-            wh_stock_val = run_query("SELECT SUM(quantity * purchase_price) as val FROM inventory WHERE warehouse=%s;", (wh_filter,))[0]['val'] or 0
-            wh_month_in = run_query(
-                "SELECT SUM(quantity) as val FROM stock_movements WHERE movement_type='IN' AND warehouse=%s AND TO_CHAR(created_at, 'YYYY-MM')=%s;",
-                (wh_filter, current_month)
-            )[0]['val'] or 0
-            wh_month_out = run_query(
-                "SELECT SUM(quantity) as val FROM stock_movements WHERE movement_type='OUT' AND warehouse=%s AND TO_CHAR(created_at, 'YYYY-MM')=%s;",
-                (wh_filter, current_month)
-            )[0]['val'] or 0
-
+        if wh_filter == "전체":
             k1, k2, k3, k4 = st.columns(4)
-            k1.metric("창고 잔여재고", f"{wh_stock_qty:,} 개")
-            k2.metric("창고 재고금액(매입가)", f"￥{wh_stock_val:,.0f}")
-            k3.metric("월간 입고량", f"{wh_month_in:,} 개")
-            k4.metric("월간 출고량", f"{wh_month_out:,} 개")
+            k1.metric("총 재고 수량", f"{run_query('SELECT SUM(quantity) as v FROM inventory;')[0]['v'] or 0:,} 개")
+            k2.metric("총 재고 금액(￥)", f"￥{run_query('SELECT SUM(quantity * purchase_price) as v FROM inventory;')[0]['v'] or 0:,.0f}")
+            k3.metric("이번달 총 입고", f"{run_query('SELECT SUM(quantity) as v FROM stock_movements WHERE movement_type=''IN'' AND TO_CHAR(movement_date, ''YYYY-MM'')=%s;', (current_month,))[0]['v'] or 0:,} 개")
+            k4.metric("이번달 총 출고", f"{run_query('SELECT SUM(quantity) as v FROM stock_movements WHERE movement_type=''OUT'' AND TO_CHAR(movement_date, ''YYYY-MM'')=%s;', (current_month,))[0]['v'] or 0:,} 개")
 
-            st.divider()
-            st.subheader(f"🔍 [{wh_filter}] 상세 세부 재고 (LOT별)")
-            detail_data = run_query("""
-                SELECT item_code, item_name, jan_code, lot_no, quantity, purchase_price, (quantity * purchase_price) as total_amount
-                FROM inventory WHERE warehouse=%s ORDER BY item_code, lot_no;
-            """, (wh_filter,))
-            if detail_data:
-                df_detail = pd.DataFrame(detail_data)
-                df_detail.columns = ["제품코드", "제품명", "JAN코드", "LOT번호", "수량", "매입단가(￥)", "총 재고금액(￥)"]
-                st.dataframe(df_detail, use_container_width=True)
-            else:
-                st.info(f"{wh_filter} 창고에 재고가 없습니다.")
-
-    # --------------------------------------------------
-    # 2) 입고 등록 (사원, 관리자만)
-    # --------------------------------------------------
-    elif menu == "📥 입고 등록":
-        if role == "guest":
-            st.warning("🔒 방문자는 조회만 가능합니다.")
+            st.subheader("📋 제품 통합 재고")
+            df = run_query("SELECT item_name, jan_code, SUM(quantity) as qty, AVG(purchase_price) as avg_p, SUM(quantity * purchase_price) as tot FROM inventory GROUP BY item_name, jan_code ORDER BY item_name;")
+            if df: st.dataframe(pd.DataFrame(df).rename(columns={"item_name":"제품명", "jan_code":"JAN", "qty":"총수량", "avg_p":"평균매입가", "tot":"총금액"}), use_container_width=True)
         else:
-            st.subheader("📥 제품 입고 입력 (재고 증가)")
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                in_code = st.text_input("제품코드*")
-                in_name = st.text_input("제품명*")
-                in_jan = st.text_input("JAN 코드")
-            with c2:
-                in_lot = st.text_input("LOT 번호*")
-                in_wh = st.selectbox("입고 창고명*", warehouses)
-            with c3:
-                in_qty = st.number_input("입고 수량*", min_value=1, value=1)
-                in_price = st.number_input("매입 단가(￥)*", min_value=0.0, value=0.0, step=100.0)
+            st.subheader(f"🏬 {wh_filter} 창고 상세 (LOT별)")
+            df = run_query("SELECT item_code, item_name, lot_no, quantity, purchase_price, (quantity*purchase_price) as tot FROM inventory WHERE warehouse=%s;", (wh_filter,))
+            if df: st.dataframe(pd.DataFrame(df).rename(columns={"item_code":"코드", "item_name":"제품명", "lot_no":"LOT", "quantity":"수량", "purchase_price":"매입단가", "tot":"총금액"}), use_container_width=True)
 
-            calc_total = in_qty * in_price
-            st.info(f"💡 **총 입고 예상 금액:** ￥{calc_total:,.0f}")
+    # --- 2) 입고 등록 ---
+    elif menu == "📥 입고 등록" and role != "guest":
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            in_date = st.date_input("입고 일자*", datetime.today())
+            in_type = st.selectbox("매입/제공 유형*", ["매입/발주납품", "FOC무료제공"])
+            in_code = st.text_input("제품코드*")
+        with col2:
+            in_name = st.text_input("제품명*")
+            in_jan = st.text_input("JAN 코드")
+            in_lot = st.text_input("LOT 번호*")
+        with col3:
+            in_wh = st.selectbox("입고 창고*", warehouses)
+            in_qty = st.number_input("입고 수량*", min_value=1)
+            in_price = st.number_input("매입 단가(￥)*", value=0.0 if in_type == "FOC무료제공" else 0.0)
 
-            if st.button("입고 확정 및 저장", use_container_width=True):
-                if in_code and in_name and in_lot and in_wh and in_qty > 0:
-                    # Inventory Upsert
-                    ex = run_query("SELECT id, quantity FROM inventory WHERE item_code=%s AND lot_no=%s AND warehouse=%s;", (in_code, in_lot, in_wh))
-                    if ex:
-                        new_q = ex[0]['quantity'] + in_qty
-                        run_commit("UPDATE inventory SET quantity=%s, purchase_price=%s, item_name=%s, jan_code=%s, updated_at=CURRENT_TIMESTAMP WHERE id=%s;",
-                                   (new_q, in_price, in_name, in_jan, ex[0]['id']))
-                    else:
-                        run_commit("INSERT INTO inventory (item_code, item_name, jan_code, lot_no, warehouse, quantity, purchase_price) VALUES (%s, %s, %s, %s, %s, %s, %s);",
-                                   (in_code, in_name, in_jan, in_lot, in_wh, in_qty, in_price))
-                    
-                    # Stock Movement 이력 등록
-                    run_commit("""
-                        INSERT INTO stock_movements (movement_type, item_code, item_name, jan_code, lot_no, warehouse, quantity, unit_price, total_amount)
-                        VALUES ('IN', %s, %s, %s, %s, %s, %s, %s, %s);
-                    """, (in_code, in_name, in_jan, in_lot, in_wh, in_qty, in_price, calc_total))
-
-                    st.success("입고가 성공적으로 등록되었습니다.")
-                    st.rerun()
-                else:
-                    st.warning("필수 입력란(*)을 모두 작성해 주세요.")
-
-    # --------------------------------------------------
-    # 3) 출고 등록 (거래처 단가 자동 매핑)
-    # --------------------------------------------------
-    elif menu == "📤 출고 등록":
-        if role == "guest":
-            st.warning("🔒 방문자는 조회만 가능합니다.")
-        else:
-            st.subheader("📤 제품 출고 입력 (거래처 단가자동 매핑 및 재고 차감)")
-            
-            cust_list = [c['customer_name'] for c in run_query("SELECT customer_name FROM customers ORDER BY customer_name;")]
-            if not cust_list:
-                st.warning("⚠️ 등록된 거래처가 없습니다. 먼저 [🏢 거래처 & 단가 관리] 메뉴에서 거래처와 품목 단가를 등록하세요.")
-            else:
-                c1, c2 = st.columns(2)
-                with c1:
-                    selected_cust = st.selectbox("거래처 선택*", cust_list)
-                    
-                    # 해당 거래처에 등록된 단가 품목 가져오기
-                    cust_items = run_query("SELECT item_code, item_name, jan_code, delivery_price FROM customer_prices WHERE customer_name=%s;", (selected_cust,))
-                    item_options = {f"{i['item_name']} ({i['item_code']}) - 납품가: ￥{i['delivery_price']:,}": i for i in cust_items}
-                    
-                    if not item_options:
-                        st.error("해당 거래처에 등록된 품목 단가가 없습니다. 단가 관리를 완료해 주세요.")
-                        selected_item = None
-                    else:
-                        selected_item_label = st.selectbox("출고 품목 선택*", list(item_options.keys()))
-                        selected_item = item_options[selected_item_label]
-
-                with c2:
-                    out_wh = st.selectbox("출고 창고명*", warehouses)
-                    
-                    # 선택된 품목 & 창고의 잔여 재고 및 LOT 가져오기
-                    if selected_item:
-                        available_lots = run_query(
-                            "SELECT lot_no, quantity FROM inventory WHERE item_code=%s AND warehouse=%s AND quantity > 0;",
-                            (selected_item['item_code'], out_wh)
-                        )
-                        lot_options = {f"LOT: {l['lot_no']} (현재 재고: {l['quantity']}개)": l for l in available_lots}
-                        
-                        if not lot_options:
-                            st.warning(f"선택한 창고 [{out_wh}]에 해당 품목의 잔여 재고가 없습니다.")
-                            selected_lot = None
-                        else:
-                            selected_lot_label = st.selectbox("출고할 LOT 선택*", list(lot_options.keys()))
-                            selected_lot = lot_options[selected_lot_label]
-                    else:
-                        selected_lot = None
-
-                st.divider()
-                if selected_item and selected_lot:
-                    col_q, col_p = st.columns(2)
-                    with col_q:
-                        out_qty = st.number_input("출고 수량*", min_value=1, max_value=selected_lot['quantity'], value=1)
-                    with col_p:
-                        auto_price = selected_item['delivery_price']
-                        st.text_input("거래처 자동 매핑 납품 단가(￥)", value=f"￥{auto_price:,.0f}", disabled=True)
-                    
-                    out_total = out_qty * auto_price
-                    st.info(f"💡 **총 출고 금액:** ￥{out_total:,.0f}")
-
-                    if st.button("출고 확정 및 차감", use_container_width=True):
-                        # 재고 차감
-                        new_inv_qty = selected_lot['quantity'] - out_qty
-                        run_commit("UPDATE inventory SET quantity=%s, updated_at=CURRENT_TIMESTAMP WHERE item_code=%s AND lot_no=%s AND warehouse=%s;",
-                                   (new_inv_qty, selected_item['item_code'], selected_lot['lot_no'], out_wh))
-                        
-                        # Stock Movement 출고 이력
-                        run_commit("""
-                            INSERT INTO stock_movements (movement_type, item_code, item_name, jan_code, lot_no, warehouse, quantity, unit_price, total_amount, customer_name)
-                            VALUES ('OUT', %s, %s, %s, %s, %s, %s, %s, %s, %s);
-                        """, (selected_item['item_code'], selected_item['item_name'], selected_item['jan_code'], selected_lot['lot_no'], out_wh, out_qty, auto_price, out_total, selected_cust))
-
-                        st.success("출고 처리가 정상 등록되고 재고가 차감되었습니다.")
-                        st.rerun()
-
-    # --------------------------------------------------
-    # 4) 거래처 & 단가 관리
-    # --------------------------------------------------
-    elif menu == "🏢 거래처 & 단가 관리":
-        if role == "guest":
-            st.warning("🔒 방문자는 등록/수정이 불가합니다.")
-        else:
-            t1, t2 = st.tabs(["🏢 거래처 등록", "🏷️ 거래처별 납품 단가 관리"])
-            
-            with t1:
-                st.subheader("신규 거래처 등록")
-                new_cust = st.text_input("거래처명 입력")
-                if st.button("거래처 추가"):
-                    if new_cust:
-                        if run_commit("INSERT INTO customers (customer_name) VALUES (%s);", (new_cust,)):
-                            st.success(f"거래처 [{new_cust}]가 등록되었습니다.")
-                            st.rerun()
-                    else:
-                        st.warning("거래처명을 입력하세요.")
+        if st.button("입고 확정"):
+            if in_code and in_name and in_lot:
+                ex = run_query("SELECT id, quantity FROM inventory WHERE item_code=%s AND lot_no=%s AND warehouse=%s;", (in_code, in_lot, in_wh))
+                if ex: run_commit("UPDATE inventory SET quantity=%s, purchase_price=%s WHERE id=%s;", (ex[0]['quantity']+in_qty, in_price, ex[0]['id']))
+                else: run_commit("INSERT INTO inventory (item_code, item_name, jan_code, lot_no, warehouse, quantity, purchase_price) VALUES (%s, %s, %s, %s, %s, %s, %s);", (in_code, in_name, in_jan, in_lot, in_wh, in_qty, in_price))
                 
-                st.divider()
-                st.write("📋 현재 등록된 거래처 목록")
-                c_data = run_query("SELECT id, customer_name, created_at FROM customers ORDER BY id DESC;")
-                if c_data:
-                    st.dataframe(pd.DataFrame(c_data), use_container_width=True)
+                run_commit("INSERT INTO stock_movements (movement_date, movement_type, transaction_type, item_code, item_name, jan_code, lot_no, warehouse, quantity, unit_price, total_amount) VALUES (%s, 'IN', %s, %s, %s, %s, %s, %s, %s, %s, %s);", 
+                           (in_date, in_type, in_code, in_name, in_jan, in_lot, in_wh, in_qty, in_price, in_qty*in_price))
+                st.success("입고 완료")
+                st.rerun()
 
-            with t2:
-                st.subheader("거래처별 지정 품목 납품 단가 설정")
-                cust_list = [c['customer_name'] for c in run_query("SELECT customer_name FROM customers ORDER BY customer_name;")]
-                if not cust_list:
-                    st.info("먼저 거래처를 등록해주세요.")
-                else:
-                    sel_c = st.selectbox("거래처 선택", cust_list, key="price_cust_sel")
-                    c1, c2, c3 = st.columns(3)
-                    with c1:
-                        p_code = st.text_input("품목 코드*")
-                        p_name = st.text_input("품목명*")
-                    with c2:
-                        p_jan = st.text_input("JAN 코드")
-                        p_del_price = st.number_input("지정 납품 단가(￥)*", min_value=0.0, value=0.0, step=100.0)
+    # --- 3) 출고 등록 ---
+    elif menu == "📤 출고 등록" and role != "guest":
+        c1, c2, c3, c4 = st.columns(4)
+        out_date = c1.date_input("출고 일자*", datetime.today())
+        out_trans = c2.selectbox("매입/제공 유형*", ["발주납품", "FOC무료제공"])
+        out_type = c3.selectbox("출고 세부 유형*", ["발주", "샘플발송"])
+        out_wh = c4.selectbox("출고 창고*", warehouses)
+
+        cust_list = [c['customer_name'] for c in run_query("SELECT customer_name FROM customers;")]
+        selected_cust = st.selectbox("발주 거래처*", cust_list) if cust_list else None
+        
+        if selected_cust:
+            items = {f"{i['item_name']} (￥{i['delivery_price']})": i for i in run_query("SELECT * FROM customer_prices WHERE customer_name=%s;", (selected_cust,))}
+            sel_item = items.get(st.selectbox("품목*", list(items.keys()))) if items else None
+            
+            if sel_item:
+                lots = {f"LOT: {l['lot_no']} (재고:{l['quantity']})": l for l in run_query("SELECT * FROM inventory WHERE item_code=%s AND warehouse=%s AND quantity>0;", (sel_item['item_code'], out_wh))}
+                sel_lot = lots.get(st.selectbox("LOT*", list(lots.keys()))) if lots else None
+                
+                if sel_lot:
+                    out_qty = st.number_input("수량*", min_value=1, max_value=sel_lot['quantity'])
+                    price = 0 if out_trans == "FOC무료제공" else sel_item['delivery_price']
                     
-                    if st.button("거래처 단가 저장/수정"):
-                        if p_code and p_name:
-                            run_commit("""
-                                INSERT INTO customer_prices (customer_name, item_code, item_name, jan_code, delivery_price)
-                                VALUES (%s, %s, %s, %s, %s)
-                                ON CONFLICT (customer_name, item_code) 
-                                DO UPDATE SET delivery_price=EXCLUDED.delivery_price, item_name=EXCLUDED.item_name, jan_code=EXCLUDED.jan_code;
-                            """, (sel_c, p_code, p_name, p_jan, p_del_price))
-                            st.success(f"[{sel_c}] 의 [{p_name}] 납품 단가(￥{p_del_price:,.0f})가 저장되었습니다.")
-                            st.rerun()
-                        else:
-                            st.warning("품목코드와 품목명을 입력하세요.")
-
                     st.divider()
-                    st.write(f"📋 [{sel_c}] 등록 단가 리스트")
-                    cp_data = run_query("SELECT item_code, item_name, jan_code, delivery_price FROM customer_prices WHERE customer_name=%s;", (sel_c,))
-                    if cp_data:
-                        df_cp = pd.DataFrame(cp_data)
-                        df_cp.columns = ["품목코드", "품목명", "JAN코드", "납품단가(￥)"]
-                        st.dataframe(df_cp, use_container_width=True)
+                    st.markdown("##### 🚚 배송 및 추가 정보")
+                    d1, d2, d3 = st.columns(3)
+                    po_num = d1.text_input("발주 번호")
+                    del_place = d2.text_input("납품처명")
+                    del_phone = d3.text_input("전화번호")
+                    
+                    z1, z2 = st.columns([1,3])
+                    zip_code = z1.text_input("우편번호")
+                    del_addr = z2.text_input("상세 주소")
+                    ship_fee = st.number_input("배송비(￥)", value=0.0)
 
-    # --------------------------------------------------
-    # 5) 계정 승인 및 관리 (관리자)
-    # --------------------------------------------------
-    elif menu == "👥 계정 승인 및 관리" and role == "admin":
-        st.header("👥 계정 승인 및 권한 관리 시스템")
+                    if st.button("출고 확정 및 재고 차감", type="primary"):
+                        run_commit("UPDATE inventory SET quantity=%s WHERE item_code=%s AND lot_no=%s AND warehouse=%s;", (sel_lot['quantity']-out_qty, sel_item['item_code'], sel_lot['lot_no'], out_wh))
+                        run_commit("""INSERT INTO stock_movements (movement_date, movement_type, transaction_type, outbound_type, item_code, item_name, lot_no, warehouse, quantity, unit_price, total_amount, customer_name, po_number, delivery_place, zip_code, delivery_address, delivery_phone, shipping_fee) 
+                                      VALUES (%s, 'OUT', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",
+                                   (out_date, out_trans, out_type, sel_item['item_code'], sel_item['item_name'], sel_lot['lot_no'], out_wh, out_qty, price, out_qty*price, selected_cust, po_num, del_place, zip_code, del_addr, del_phone, ship_fee))
+                        st.success("출고 완료")
+                        st.rerun()
+
+    # --- 4) 기간별 입출고 이력 ---
+    elif menu == "📋 기간별 입출고 이력":
+        c1, c2 = st.columns(2)
+        dates = c1.date_input("조회 기간 (시작일 - 종료일)", [datetime.today() - timedelta(days=30), datetime.today()])
+        m_type = c2.selectbox("입출고 구분", ["전체", "입고 (IN)", "출고 (OUT)"])
         
-        st.subheader("⏳ 승인 대기 신청 (Pending)")
-        pending_users = run_query("SELECT id, username, name, role FROM users WHERE status='pending';")
-        
-        if pending_users:
-            role_labels = {"admin": "관리자", "staff": "사원", "guest": "방문자"}
-            for u in pending_users:
-                col1, col2, col3, col4 = st.columns([2, 1.5, 1, 1])
-                col1.write(f"**{u['username']}** ({u['name']})")
-                col2.write(f"요청권한: **{role_labels.get(u['role'], u['role'])}**")
-                
-                if col3.button("승인", key=f"app_{u['id']}"):
-                    run_commit("UPDATE users SET status='active' WHERE id=%s;", (u['id'],))
-                    st.success(f"{u['username']} 계정을 승인했습니다.")
-                    st.rerun()
-                if col4.button("거절", key=f"rej_{u['id']}"):
-                    run_commit("UPDATE users SET status='rejected' WHERE id=%s;", (u['id'],))
-                    st.warning(f"{u['username']} 계정을 거절했습니다.")
-                    st.rerun()
-        else:
-            st.info("대기 중인 가입 신청이 없습니다.")
+        if len(dates) == 2:
+            query = "SELECT movement_date as 일자, movement_type as 구분, transaction_type as 유형, outbound_type as 출고구분, warehouse as 창고, item_name as 제품명, lot_no as LOT, quantity as 수량, total_amount as 금액, customer_name as 거래처, shipping_fee as 배송비, zip_code as 우편번호, delivery_place as 납품처 FROM stock_movements WHERE movement_date BETWEEN %s AND %s"
+            params = [dates[0], dates[1]]
+            if m_type != "전체":
+                query += " AND movement_type = %s"
+                params.append("IN" if "입고" in m_type else "OUT")
             
+            df = run_query(query + " ORDER BY movement_date DESC;", params)
+            if df: st.dataframe(pd.DataFrame(df), use_container_width=True)
+            else: st.info("조건에 맞는 이력이 없습니다.")
+
+    # --- 5) 거래처 & 단가 관리 ---
+    elif menu == "🏢 거래처 & 단가 관리" and role != "guest":
+        new_cust = st.text_input("새 거래처명")
+        if st.button("추가") and new_cust: run_commit("INSERT INTO customers (customer_name) VALUES (%s);", (new_cust,))
         st.divider()
-        st.subheader("⚙️ 전체 계정 목록 및 권한 수정")
-        all_users = run_query("SELECT id, username, name, role, status FROM users WHERE username != 'admin';")
         
-        if all_users:
-            role_options = ["사원", "관리자", "방문자"]
-            role_to_code = {"사원": "staff", "관리자": "admin", "방문자": "guest"}
-            code_to_role = {"staff": "사원", "admin": "관리자", "guest": "방문자"}
+        custs = [c['customer_name'] for c in run_query("SELECT customer_name FROM customers;")]
+        if custs:
+            sel_c = st.selectbox("거래처 선택", custs)
+            p_code = st.text_input("품목코드")
+            p_name = st.text_input("품목명")
+            p_price = st.number_input("납품단가(￥)")
+            if st.button("단가 저장") and p_code and p_name:
+                run_commit("INSERT INTO customer_prices (customer_name, item_code, item_name, delivery_price) VALUES (%s,%s,%s,%s) ON CONFLICT (customer_name, item_code) DO UPDATE SET delivery_price=EXCLUDED.delivery_price, item_name=EXCLUDED.item_name;", (sel_c, p_code, p_name, p_price))
             
-            for u in all_users:
-                col1, col2, col3, col4, col5 = st.columns([2, 1.5, 1, 1, 1])
-                status_icon = "🟢 활성" if u['status'] == 'active' else "🔴 비활성"
-                
-                col1.write(f"**{u['username']}** ({u['name']}) [{status_icon}]")
-                current_role_label = code_to_role.get(u['role'], "방문자")
-                new_role_label = col2.selectbox("권한 변경", role_options, index=role_options.index(current_role_label), key=f"role_sel_{u['id']}")
-                
-                if col3.button("권한 저장", key=f"save_role_{u['id']}"):
-                    new_code = role_to_code[new_role_label]
-                    run_commit("UPDATE users SET role=%s WHERE id=%s;", (new_code, u['id']))
-                    st.success(f"{u['username']} 님의 권한이 [{new_role_label}]로 변경되었습니다.")
-                    st.rerun()
-                
-                if u['status'] == 'active':
-                    if col4.button("비활성화", key=f"deact_{u['id']}"):
-                        run_commit("UPDATE users SET status='disabled' WHERE id=%s;", (u['id'],))
-                        st.rerun()
-                else:
-                    if col4.button("활성화", key=f"act_{u['id']}"):
-                        run_commit("UPDATE users SET status='active' WHERE id=%s;", (u['id'],))
-                        st.rerun()
-                        
-                if col5.button("삭제", key=f"del_{u['id']}"):
-                    run_commit("DELETE FROM users WHERE id=%s;", (u['id'],))
-                    st.success("계정이 삭제되었습니다.")
-                    st.rerun()
-        else:
-            st.write("등록된 일반 계정이 없습니다.")
+            df = run_query("SELECT item_code, item_name, delivery_price FROM customer_prices WHERE customer_name=%s;", (sel_c,))
+            if df: st.dataframe(pd.DataFrame(df), use_container_width=True)
+
+    # --- 6) 계정 관리 ---
+    elif menu == "👥 계정 관리" and role == "admin":
+        st.write("승인 대기")
+        for u in run_query("SELECT * FROM users WHERE status='pending';"):
+            if st.button(f"승인: {u['username']}", key=u['id']): run_commit("UPDATE users SET status='active' WHERE id=%s;", (u['id'],)); st.rerun()
