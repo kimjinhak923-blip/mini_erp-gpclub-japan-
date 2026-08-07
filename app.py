@@ -1,5 +1,6 @@
 import streamlit as st
 import psycopg2
+from psycopg2 import pool
 import pandas as pd
 from datetime import datetime, timedelta
 
@@ -341,10 +342,13 @@ T = {
     }
 }
 
-# --- 3. DB 연결 및 실행 함수 ---
-def get_connection():
+# --- 3. DB 연결 커넥션 풀(Connection Pool) 최적화 ---
+@st.cache_resource
+def init_db_pool():
     try:
-        return psycopg2.connect(
+        return pool.SimpleConnectionPool(
+            minconn=1,
+            maxconn=10,
             host=st.secrets.get("DB_HOST"),
             database=st.secrets.get("DB_NAME", "postgres"),
             user=st.secrets.get("DB_USER"),
@@ -352,8 +356,19 @@ def get_connection():
             port=st.secrets.get("DB_PORT", "6543")
         )
     except Exception as e:
-        st.error(f"DB Connection Error: {e}")
+        st.error(f"DB Connection Pool Error: {e}")
         return None
+
+db_pool = init_db_pool()
+
+def get_connection():
+    if db_pool:
+        return db_pool.getconn()
+    return None
+
+def release_connection(conn):
+    if db_pool and conn:
+        db_pool.putconn(conn)
 
 def run_query(query, params=None):
     conn = get_connection()
@@ -369,7 +384,7 @@ def run_query(query, params=None):
         st.error(f"Query Error: {e}")
         return []
     finally:
-        conn.close()
+        release_connection(conn)
 
 def run_commit(query, params=None):
     conn = get_connection()
@@ -378,24 +393,16 @@ def run_commit(query, params=None):
         with conn.cursor() as cur:
             cur.execute(query, params)
         conn.commit()
+        st.cache_data.clear() # 데이터 변경 시 캐시 자동 초기화
         return True
     except Exception as e:
         st.error(f"Save Error: {e}")
         return False
     finally:
-        conn.close()
+        release_connection(conn)
 
-def init_db():
-    run_commit("""
-        CREATE TABLE IF NOT EXISTS exchange_rates (
-            year_month VARCHAR(7) PRIMARY KEY,
-            krw_per_jpy NUMERIC NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
-
-init_db()
-
+# --- 4. 자주 쓰이는 조회 쿼리 캐싱(st.cache_data) ---
+@st.cache_data(ttl=60)
 def get_exchange_rate(year_month=None):
     if not year_month:
         year_month = datetime.now().strftime('%Y-%m')
@@ -404,7 +411,19 @@ def get_exchange_rate(year_month=None):
         return float(res[0]['krw_per_jpy'])
     return 9.0
 
-# --- 4. 세션 상태 및 언어 설정 초기화 ---
+@st.cache_data(ttl=60)
+def fetch_master_products():
+    return run_query("SELECT * FROM master_products ORDER BY item_name;")
+
+@st.cache_data(ttl=60)
+def fetch_customers():
+    return run_query("SELECT customer_name FROM customers ORDER BY customer_name;")
+
+@st.cache_data(ttl=60)
+def fetch_customer_prices(customer_name):
+    return run_query("SELECT * FROM customer_prices WHERE customer_name=%s ORDER BY item_name;", (customer_name,))
+
+# --- 5. 세션 상태 및 언어 설정 초기화 ---
 if "logged_in" not in st.session_state:
     st.session_state.update({"logged_in": False, "username": "", "role": "guest"})
 
@@ -420,7 +439,7 @@ selected_lang_label = st.sidebar.selectbox(
 st.session_state["lang"] = lang_map[selected_lang_label]
 L = T[st.session_state["lang"]]
 
-# --- 5. 로그인 및 회원가입 화면 ---
+# --- 6. 로그인 및 회원가입 화면 ---
 if not st.session_state["logged_in"]:
     st.title(L["title"])
     tab1, tab2 = st.tabs([L["login"], L["signup_req"]])
@@ -448,7 +467,7 @@ if not st.session_state["logged_in"]:
                 elif run_commit("INSERT INTO users (username, password, name, role, status) VALUES (%s, %s, %s, %s, 'pending');", (new_user, new_pass, new_name, req_role)):
                     st.success(L["signup_success"])
 
-# --- 6. 메인 ERP 화면 ---
+# --- 7. 메인 ERP 화면 ---
 else:
     role = st.session_state["role"]
     warehouses = ["SAGAWA", "L&K", "大吉商事"]
@@ -491,13 +510,13 @@ else:
         
         if st.button(L["rate_save"], type="primary"):
             rate_per_jpy = rate_100jpy / 100.0
-            run_commit("""
+            if run_commit("""
                 INSERT INTO exchange_rates (year_month, krw_per_jpy) 
                 VALUES (%s, %s) 
                 ON CONFLICT (year_month) DO UPDATE SET krw_per_jpy=EXCLUDED.krw_per_jpy, updated_at=CURRENT_TIMESTAMP;
-            """, (target_ym, rate_per_jpy))
-            st.success(f"Saved: {target_ym} (100 JPY = {rate_100jpy:,.1f} KRW)")
-            st.rerun()
+            """, (target_ym, rate_per_jpy)):
+                st.success(f"Saved: {target_ym} (100 JPY = {rate_100jpy:,.1f} KRW)")
+                st.rerun()
 
         st.divider()
         st.markdown(f"##### {L['rate_list']}")
@@ -546,16 +565,6 @@ else:
 
     # --- 📦 취급 제품 마스터 ---
     elif selected_menu_key == "m_prod" and role != "guest":
-        alter_cols = [
-            "jan_box VARCHAR(100)", "jan_piece VARCHAR(100)",
-            "box_in_box INT DEFAULT 0", "box_in_piece INT DEFAULT 0",
-            "prod_size_w NUMERIC DEFAULT 0", "prod_size_d NUMERIC DEFAULT 0", "prod_size_h NUMERIC DEFAULT 0",
-            "carton_size_w NUMERIC DEFAULT 0", "carton_size_d NUMERIC DEFAULT 0", "carton_size_h NUMERIC DEFAULT 0",
-            "pallet_in_box INT DEFAULT 0", "pallet_in_carton INT DEFAULT 0"
-        ]
-        for col_def in alter_cols:
-            run_commit(f"ALTER TABLE master_products ADD COLUMN IF NOT EXISTS {col_def};")
-
         tab_reg, tab_edit = st.tabs([L["tab_reg"], L["tab_edit"]])
 
         with tab_reg:
@@ -625,7 +634,7 @@ else:
 
         with tab_edit:
             st.subheader(L["tab_edit"])
-            all_products = run_query("SELECT * FROM master_products ORDER BY item_name;")
+            all_products = fetch_master_products()
             
             if all_products:
                 prod_map = {f"{p['item_name']} [{p['item_code']}]": p for p in all_products}
@@ -696,13 +705,13 @@ else:
                             st.rerun()
 
         st.divider()
-        master_list = run_query("SELECT item_code, item_name, default_purchase_price, jan_box, jan_piece FROM master_products ORDER BY item_name;")
+        master_list = fetch_master_products()
         if master_list:
             st.dataframe(pd.DataFrame(master_list), use_container_width=True)
 
-    # --- 📥 입고 등록 ---
+    # --- 📥 입고 등록 (한국 매입: 원화 ₩) ---
     elif selected_menu_key == "m_in" and role != "guest":
-        master_products = run_query("SELECT item_code, item_name, jan_box, default_purchase_price FROM master_products ORDER BY item_name;")
+        master_products = fetch_master_products()
         prod_options = {f"{p['item_name']} [{p['item_code']}]": p for p in master_products} if master_products else {}
         
         st.subheader(L["in_title"])
@@ -746,27 +755,24 @@ else:
     elif selected_menu_key == "m_out" and role != "guest":
         st.subheader(L["out_title"])
         
-        # 1. 기본 출고 정보 입력
         st.markdown("##### 📌 출고 기본 정보")
         c1, c2, c3 = st.columns(3)
         out_date = c1.date_input(L["out_date"], datetime.today())
         out_trans = c2.selectbox(L["out_category"], ["납품(유상)", "FOC(무상)", "샘플발송"])
         out_wh = c3.selectbox(L["out_wh"], warehouses)
 
-        # 2. 거래처 및 품목/수량 선택
         st.markdown("##### 📦 거래처 / 품목 / 수량 선택")
         c_col1, c_col2 = st.columns(2)
         
-        cust_list = [c['customer_name'] for c in run_query("SELECT customer_name FROM customers;")]
+        cust_list = [c['customer_name'] for c in fetch_customers()]
         selected_cust = c_col1.selectbox(L["cust_name"], cust_list) if cust_list else c_col1.text_input(L["cust_name"])
 
-        # 선택된 거래처 기반 단가/제품 불러오기
         if selected_cust:
-            cust_items = run_query("SELECT * FROM customer_prices WHERE customer_name=%s;", (selected_cust,))
+            cust_items = fetch_customer_prices(selected_cust)
             if cust_items:
                 items_map = {f"{i['item_name']} [코드:{i['item_code']}] (납품단가: ￥{i['delivery_price']})": i for i in cust_items}
             else:
-                all_p = run_query("SELECT item_code, item_name, default_purchase_price FROM master_products ORDER BY item_name;")
+                all_p = fetch_master_products()
                 items_map = {f"{i['item_name']} [{i['item_code']}]": i for i in all_p} if all_p else {}
 
             selected_item_label = c_col2.selectbox(L["sel_item"], list(items_map.keys())) if items_map else None
@@ -777,7 +783,6 @@ else:
                 item_name = sel_item['item_name']
                 cust_jpy_price = float(sel_item.get('delivery_price', 0.0))
 
-                # LOT 선택 및 수량 입력
                 q_col1, q_col2, q_col3 = st.columns(3)
                 lots = {f"LOT: {l['lot_no']} (잔여재고: {l['quantity']}개, 매입단가: ₩{l['purchase_price']:,.0f})": l for l in run_query("SELECT * FROM inventory WHERE item_code=%s AND warehouse=%s AND quantity>0;", (item_code, out_wh))}
 
@@ -795,7 +800,6 @@ else:
                         total_amount = 0.0
                         q_col3.info(L["foc_notice"].format(cost=cost_krw))
 
-                    # 3. 납품처 상세 정보 (우편번호 / 주소 / 전화번호 / 납품처 회사명)
                     st.divider()
                     st.markdown(f"##### {L['sec_ship']}")
                     
@@ -809,16 +813,13 @@ else:
                     del_addr = z2.text_input(L["del_addr"], placeholder="도쿄도 미나토쿠 ...")
                     ship_fee = z3.number_input(L["ship_fee"], value=0.0)
 
-                    # 4. 출고 승인 버튼
                     st.divider()
                     if st.button(L["btn_out_confirm"], type="primary", use_container_width=True):
                         if not del_place or not del_phone or not zip_code or not del_addr:
                             st.error("납품처 회사명, 전화번호, 우편번호, 상세주소를 모두 입력해주세요.")
                         else:
-                            # 1) 재고 차감
                             run_commit("UPDATE inventory SET quantity=%s WHERE item_code=%s AND lot_no=%s AND warehouse=%s;", (sel_lot['quantity'] - out_qty, item_code, sel_lot['lot_no'], out_wh))
                             
-                            # 2) 출고 이력 저장
                             run_commit("""INSERT INTO stock_movements (
                                             movement_date, movement_type, transaction_type, outbound_type, 
                                             item_code, item_name, lot_no, warehouse, quantity, 
@@ -849,7 +850,7 @@ else:
             if df:
                 st.dataframe(pd.DataFrame(df), use_container_width=True)
 
-    # --- 🏢 거래처 & 납품단가 관리 ---
+    # --- 🏢 거래처 & 납품단가 관리 (엔화 ￥) ---
     elif selected_menu_key == "m_cust" and role != "guest":
         st.subheader(L["add_cust_title"])
         new_cust = st.text_input(L["new_cust_name"])
@@ -860,12 +861,12 @@ else:
             
         st.divider()
         
-        custs = [c['customer_name'] for c in run_query("SELECT customer_name FROM customers;")]
+        custs = [c['customer_name'] for c in fetch_customers()]
         if custs:
             sel_c = st.selectbox(L["sel_cust_mgt"], custs)
             
             st.markdown(f"#### {L['price_reg_title'].format(cust=sel_c)}")
-            master_prods = run_query("SELECT item_code, item_name FROM master_products ORDER BY item_name;")
+            master_prods = fetch_master_products()
             
             col_a, col_b = st.columns(2)
             if master_prods:
@@ -890,7 +891,7 @@ else:
 
             st.divider()
             st.markdown(f"##### {L['price_list_title'].format(cust=sel_c)}")
-            curr_prices = run_query("SELECT id, item_code, item_name, delivery_price FROM customer_prices WHERE customer_name=%s ORDER BY item_name;", (sel_c,))
+            curr_prices = fetch_customer_prices(sel_c)
             
             if curr_prices:
                 for cp in curr_prices:
