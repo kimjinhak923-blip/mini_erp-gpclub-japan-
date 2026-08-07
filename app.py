@@ -92,22 +92,22 @@ T = {
         "btn_in_confirm": "입고 확정",
 
         # 출고
-        "out_title": "📤 출고 등록 (일본 판매/제공)",
+        "out_title": "📤 출고 등록 (납품/FOC/샘플)",
         "out_date": "출고 일자*",
         "out_category": "출고 구분*",
         "out_wh": "출고 창고*",
-        "cust_name": "발주 거래처 / 수령처*",
-        "sel_item": "품목*",
-        "sel_lot": "LOT*",
+        "cust_name": "발주 거래처명*",
+        "sel_item": "출고 품목*",
+        "sel_lot": "LOT 번호*",
         "out_qty": "출고 수량*",
         "out_unit_price": "적용 단가",
         "foc_notice": "💡 FOC/샘플건은 매출 단가 ￥0으로 처리되며, 원가(원화 ₩{cost:,.0f})로 이력이 집계됩니다.",
-        "sec_ship": "🚚 배송 및 추가 정보",
+        "sec_ship": "🚚 납품처 정보 (배송지)",
         "po_num": "발주 번호",
-        "del_place": "납품처명",
-        "del_phone": "전화번호",
-        "zip_code": "우편번호",
-        "del_addr": "상세 주소",
+        "del_place": "납품처 회사명*",
+        "del_phone": "전화번호*",
+        "zip_code": "우편번호*",
+        "del_addr": "상세 주소*",
         "ship_fee": "배송비(엔/JPY ￥)",
         "btn_out_confirm": "출고 확정 및 재고 차감",
 
@@ -131,7 +131,7 @@ T = {
         "req_role": "申請権限",
         "login_btn": "ログイン",
         "signup_btn": "登録申請を送信",
-        "login_fail": "ID/パスワードが正しくないか、承認待ちのアカウントです。",
+        "login_fail": "ID/パスワード가 正しくないか、承認待ちのアカウントです。",
         "signup_exists": "既に存在するユーザーIDです。",
         "signup_success": "登録申請が完了しました。",
         "logout": "ログアウト",
@@ -201,22 +201,22 @@ T = {
         "btn_in_confirm": "入庫確定",
 
         # 출고
-        "out_title": "📤 出庫登録 (日本販売/提供)",
+        "out_title": "📤 出庫登録 (納品/FOC/サンプル)",
         "out_date": "出荷日*",
         "out_category": "出荷区分*",
         "out_wh": "出荷倉庫*",
-        "cust_name": "発注取引先 / 受領先*",
-        "sel_item": "品目*",
-        "sel_lot": "LOT*",
+        "cust_name": "発注取引先名*",
+        "sel_item": "出荷品目*",
+        "sel_lot": "LOT番号*",
         "out_qty": "出荷数量*",
         "out_unit_price": "適用単価",
         "foc_notice": "💡 FOC/サンプルは売上単価 ￥0として処理され、原価(ウォン ₩{cost:,.0f})で履歴が集計されます。",
-        "sec_ship": "🚚 配送及び追加情報",
+        "sec_ship": "🚚 納品先情報 (配送先)",
         "po_num": "発注番号",
-        "del_place": "納品先名",
-        "del_phone": "電話番号",
-        "zip_code": "郵便番号",
-        "del_addr": "詳細住所",
+        "del_place": "納品先 会社名*",
+        "del_phone": "電話番号*",
+        "zip_code": "郵便番号*",
+        "del_addr": "詳細住所*",
         "ship_fee": "送料(円/JPY ￥)",
         "btn_out_confirm": "出荷確定および在庫減算",
 
@@ -314,18 +314,18 @@ T = {
         "out_date": "Outbound Date*",
         "out_category": "Outbound Category*",
         "out_wh": "Source Warehouse*",
-        "cust_name": "Customer / Recipient*",
-        "sel_item": "Item*",
-        "sel_lot": "LOT*",
+        "cust_name": "Customer Name*",
+        "sel_item": "Outbound Item*",
+        "sel_lot": "LOT Number*",
         "out_qty": "Quantity*",
         "out_unit_price": "Applied Price",
         "foc_notice": "💡 FOC/Sample items are billed at ￥0 sales, tracked by cost price (KRW ₩{cost:,.0f}).",
-        "sec_ship": "🚚 Shipping Details",
+        "sec_ship": "🚚 Delivery Address Details",
         "po_num": "PO Number",
-        "del_place": "Delivery Place Name",
-        "del_phone": "Phone Number",
-        "zip_code": "Postal Code",
-        "del_addr": "Full Address",
+        "del_place": "Delivery Company Name*",
+        "del_phone": "Phone Number*",
+        "zip_code": "Postal Code*",
+        "del_addr": "Full Address*",
         "ship_fee": "Shipping Fee (JPY ￥)",
         "btn_out_confirm": "Confirm Outbound & Deduct Stock",
 
@@ -700,7 +700,7 @@ else:
         if master_list:
             st.dataframe(pd.DataFrame(master_list), use_container_width=True)
 
-    # --- 📥 입고 등록 (한국 매입: 원화 ₩) ---
+    # --- 📥 입고 등록 ---
     elif selected_menu_key == "m_in" and role != "guest":
         master_products = run_query("SELECT item_code, item_name, jan_box, default_purchase_price FROM master_products ORDER BY item_name;")
         prod_options = {f"{p['item_name']} [{p['item_code']}]": p for p in master_products} if master_products else {}
@@ -742,92 +742,95 @@ else:
                 st.success("Confirmed.")
                 st.rerun()
 
-    # --- 📤 출고 등록 (납품 / FOC / 샘플) ---
+    # --- 📤 출고 등록 ---
     elif selected_menu_key == "m_out" and role != "guest":
         st.subheader(L["out_title"])
+        
+        # 1. 기본 출고 정보 입력
+        st.markdown("##### 📌 출고 기본 정보")
         c1, c2, c3 = st.columns(3)
         out_date = c1.date_input(L["out_date"], datetime.today())
-        
-        # 출고 구분 선택: 납품(유상), FOC(무상), 샘플발송
         out_trans = c2.selectbox(L["out_category"], ["납품(유상)", "FOC(무상)", "샘플발송"])
         out_wh = c3.selectbox(L["out_wh"], warehouses)
 
-        cust_list = [c['customer_name'] for c in run_query("SELECT customer_name FROM customers;")]
-        selected_cust = st.selectbox(L["cust_name"], cust_list) if cust_list else None
+        # 2. 거래처 및 품목/수량 선택
+        st.markdown("##### 📦 거래처 / 품목 / 수량 선택")
+        c_col1, c_col2 = st.columns(2)
         
+        cust_list = [c['customer_name'] for c in run_query("SELECT customer_name FROM customers;")]
+        selected_cust = c_col1.selectbox(L["cust_name"], cust_list) if cust_list else c_col1.text_input(L["cust_name"])
+
+        # 선택된 거래처 기반 단가/제품 불러오기
         if selected_cust:
-            # 해당 거래처에 등록된 품목들 가져오기
             cust_items = run_query("SELECT * FROM customer_prices WHERE customer_name=%s;", (selected_cust,))
-            
-            # 거래처 품목이 없더라도 제품 마스터 전체에서 선택 가능하도록 지원
             if cust_items:
                 items_map = {f"{i['item_name']} [코드:{i['item_code']}] (납품단가: ￥{i['delivery_price']})": i for i in cust_items}
-                selected_item_label = st.selectbox(L["sel_item"], list(items_map.keys()))
-                sel_item = items_map[selected_item_label]
-                item_code = sel_item['item_code']
-                item_name = sel_item['item_name']
-                cust_jpy_price = float(sel_item['delivery_price'])
             else:
                 all_p = run_query("SELECT item_code, item_name, default_purchase_price FROM master_products ORDER BY item_name;")
                 items_map = {f"{i['item_name']} [{i['item_code']}]": i for i in all_p} if all_p else {}
-                selected_item_label = st.selectbox(L["sel_item"], list(items_map.keys())) if items_map else None
-                if selected_item_label:
-                    sel_item = items_map[selected_item_label]
-                    item_code = sel_item['item_code']
-                    item_name = sel_item['item_name']
-                    cust_jpy_price = 0.0
-                else:
-                    sel_item = None
 
-            if sel_item:
-                # 선택한 품목의 해당 창고 LOT 재고 목록
+            selected_item_label = c_col2.selectbox(L["sel_item"], list(items_map.keys())) if items_map else None
+
+            if selected_item_label:
+                sel_item = items_map[selected_item_label]
+                item_code = sel_item['item_code']
+                item_name = sel_item['item_name']
+                cust_jpy_price = float(sel_item.get('delivery_price', 0.0))
+
+                # LOT 선택 및 수량 입력
+                q_col1, q_col2, q_col3 = st.columns(3)
                 lots = {f"LOT: {l['lot_no']} (잔여재고: {l['quantity']}개, 매입단가: ₩{l['purchase_price']:,.0f})": l for l in run_query("SELECT * FROM inventory WHERE item_code=%s AND warehouse=%s AND quantity>0;", (item_code, out_wh))}
-                
-                if lots:
-                    sel_lot = lots[st.selectbox(L["sel_lot"], list(lots.keys()))]
-                    out_qty = st.number_input(L["out_qty"], min_value=1, max_value=sel_lot['quantity'])
-                    
-                    # --- 단가 및 매출 로직 적용 ---
-                    cost_krw = float(sel_lot['purchase_price'] or 0.0) # 기본 매입 단가(원화)
-                    
-                    if out_trans == "납품(유상)":
-                        price_jpy = cust_jpy_price # 거래처 엔화 단가 적용
-                        total_amount = out_qty * price_jpy
-                        st.success(f"💰 납품 매출 단가: **￥{price_jpy:,.0f}** | 총 매출액: **￥{total_amount:,.0f}**")
-                    else:
-                        price_jpy = 0.0 # FOC / 샘플은 매출액 ￥0
-                        total_amount = 0.0
-                        st.info(L["foc_notice"].format(cost=cost_krw))
 
+                if lots:
+                    sel_lot = lots[q_col1.selectbox(L["sel_lot"], list(lots.keys()))]
+                    out_qty = q_col2.number_input(L["out_qty"], min_value=1, max_value=sel_lot['quantity'], value=1)
+
+                    cost_krw = float(sel_lot['purchase_price'] or 0.0)
+                    if out_trans == "납품(유상)":
+                        price_jpy = cust_jpy_price
+                        total_amount = out_qty * price_jpy
+                        q_col3.metric("적용 단가 / 총액", f"￥{price_jpy:,.0f}", f"총 ￥{total_amount:,.0f}")
+                    else:
+                        price_jpy = 0.0
+                        total_amount = 0.0
+                        q_col3.info(L["foc_notice"].format(cost=cost_krw))
+
+                    # 3. 납품처 상세 정보 (우편번호 / 주소 / 전화번호 / 납품처 회사명)
                     st.divider()
                     st.markdown(f"##### {L['sec_ship']}")
-                    d1, d2, d3 = st.columns(3)
-                    po_num = d1.text_input(L["po_num"])
-                    del_place = d2.text_input(L["del_place"])
-                    del_phone = d3.text_input(L["del_phone"])
                     
-                    z1, z2 = st.columns([1, 3])
-                    zip_code = z1.text_input(L["zip_code"])
-                    del_addr = z2.text_input(L["del_addr"])
-                    ship_fee = st.number_input(L["ship_fee"], value=0.0)
+                    s1, s2, s3 = st.columns(3)
+                    po_num = s1.text_input(L["po_num"])
+                    del_place = s2.text_input(L["del_place"], placeholder="예: (주)일본유통 도쿄지점")
+                    del_phone = s3.text_input(L["del_phone"], placeholder="예: 03-1234-5678")
 
-                    if st.button(L["btn_out_confirm"], type="primary"):
-                        # 1. 재고 차감
-                        run_commit("UPDATE inventory SET quantity=%s WHERE item_code=%s AND lot_no=%s AND warehouse=%s;", (sel_lot['quantity'] - out_qty, item_code, sel_lot['lot_no'], out_wh))
-                        
-                        # 2. 입출고 이력(stock_movements)에 기록
-                        run_commit("""INSERT INTO stock_movements (
-                                        movement_date, movement_type, transaction_type, outbound_type, 
-                                        item_code, item_name, lot_no, warehouse, quantity, 
-                                        unit_price, total_amount, customer_name, po_number, 
-                                        delivery_place, zip_code, delivery_address, delivery_phone, shipping_fee
-                                      ) VALUES (%s, 'OUT', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",
-                                   (out_date, out_trans, out_trans, item_code, item_name, sel_lot['lot_no'], out_wh, out_qty, price_jpy, total_amount, selected_cust, po_num, del_place, zip_code, del_addr, del_phone, ship_fee))
-                        
-                        st.success("Confirmed.")
-                        st.rerun()
+                    z1, z2, z3 = st.columns([1, 2.5, 1])
+                    zip_code = z1.text_input(L["zip_code"], placeholder="123-4567")
+                    del_addr = z2.text_input(L["del_addr"], placeholder="도쿄도 미나토쿠 ...")
+                    ship_fee = z3.number_input(L["ship_fee"], value=0.0)
+
+                    # 4. 출고 승인 버튼
+                    st.divider()
+                    if st.button(L["btn_out_confirm"], type="primary", use_container_width=True):
+                        if not del_place or not del_phone or not zip_code or not del_addr:
+                            st.error("납품처 회사명, 전화번호, 우편번호, 상세주소를 모두 입력해주세요.")
+                        else:
+                            # 1) 재고 차감
+                            run_commit("UPDATE inventory SET quantity=%s WHERE item_code=%s AND lot_no=%s AND warehouse=%s;", (sel_lot['quantity'] - out_qty, item_code, sel_lot['lot_no'], out_wh))
+                            
+                            # 2) 출고 이력 저장
+                            run_commit("""INSERT INTO stock_movements (
+                                            movement_date, movement_type, transaction_type, outbound_type, 
+                                            item_code, item_name, lot_no, warehouse, quantity, 
+                                            unit_price, total_amount, customer_name, po_number, 
+                                            delivery_place, zip_code, delivery_address, delivery_phone, shipping_fee
+                                          ) VALUES (%s, 'OUT', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",
+                                       (out_date, out_trans, out_trans, item_code, item_name, sel_lot['lot_no'], out_wh, out_qty, price_jpy, total_amount, selected_cust, po_num, del_place, zip_code, del_addr, del_phone, ship_fee))
+                            
+                            st.success(f"✅ [{item_name}] {out_qty}개 출고 등록 및 재고 차감이 완료되었습니다!")
+                            st.rerun()
                 else:
-                    st.warning("선택한 창고에 해당 상품의 출고 가능한 재고(LOT)가 없습니다.")
+                    st.warning("⚠️ 선택한 창고에 해당 상품의 출고 가능한 재고(LOT)가 없습니다.")
 
     # --- 📋 기간별 입출고 이력 ---
     elif selected_menu_key == "m_history":
@@ -836,7 +839,7 @@ else:
         m_type = c2.selectbox("Type", ["ALL", "IN (KRW ₩)", "OUT (JPY ￥)"])
         
         if len(dates) == 2:
-            query = "SELECT movement_date, movement_type, transaction_type, warehouse, item_name, lot_no, quantity, unit_price, total_amount, customer_name FROM stock_movements WHERE movement_date BETWEEN %s AND %s"
+            query = "SELECT movement_date, movement_type, transaction_type, warehouse, item_name, lot_no, quantity, unit_price, total_amount, customer_name, delivery_place, zip_code, delivery_address, delivery_phone FROM stock_movements WHERE movement_date BETWEEN %s AND %s"
             params = [dates[0], dates[1]]
             if m_type != "ALL":
                 query += " AND movement_type = %s"
