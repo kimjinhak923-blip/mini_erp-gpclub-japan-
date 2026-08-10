@@ -1,12 +1,15 @@
 import hashlib
 from datetime import datetime
-from zoneinfo import ZoneInfo  # pytz 대신 zoneinfo 사용
+from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 from supabase import create_client, Client
 
-# 한국/일본 표준시 설정
-JST = ZoneInfo("Asia/Tokyo")  # Asia_Tokyo 대신 Asia/Tokyo 표준 이름 사용
+# --- 1. 페이지 설정 ---
+st.set_page_config(page_title="GPClub Japan Mini ERP", page_icon="🏢", layout="wide")
+
+# 일본/한국 표준시 (Asia/Tokyo)
+JST = ZoneInfo("Asia/Tokyo")
 
 
 # --- 2. Supabase 클라이언트 연결 ---
@@ -42,21 +45,21 @@ def login_page():
     st.subheader("로그인")
 
     with st.form("login_form", clear_on_submit=False):
-        username = st.text_input("아이디").strip()
-        password = st.text_input("비밀번호", type="password")
+        username_input = st.text_input("아이디").strip()
+        password_input = st.text_input("비밀번호", type="password").strip()
         submit = st.form_submit_button("로그인")
 
         if submit:
-            if not username or not password:
+            if not username_input or not password_input:
                 st.warning("아이디와 비밀번호를 모두 입력해 주세요.")
                 return
 
             try:
-                # user_profiles 테이블에서 아이디 조회
+                # user_profiles 테이블 조회 (공백 제거 적용)
                 response = (
                     supabase.table("user_profiles")
                     .select("*")
-                    .eq("username", username)
+                    .eq("username", username_input)
                     .execute()
                 )
 
@@ -65,13 +68,11 @@ def login_page():
                     return
 
                 user = response.data[0]
-                hashed_input = hash_password(password)
+                hashed_input = hash_password(password_input)
+                stored_pw = str(user.get("password_hash", ""))
 
-                # 비밀번호 검증 (해시값 비교 또는 평문 비교 하이브리드)
-                if (
-                    user.get("password_hash") == hashed_input
-                    or user.get("password_hash") == password
-                ):
+                # 평문 비밀번호 및 SHA256 해시 비밀번호 모두 검증 허용
+                if stored_pw in (password_input, hashed_input):
                     st.session_state.logged_in = True
                     st.session_state.user_info = user
                     st.success(f"{user['full_name']}님, 환영합니다!")
@@ -80,7 +81,7 @@ def login_page():
                     st.error("비밀번호가 올바르지 않습니다.")
 
             except Exception as e:
-                st.error(f"로그인 처리 중 오류 발생: {e}")
+                st.error(f"로그인 처리 중 DB 오류 발생: {e}")
 
 
 # --- 6. 메인 ERP 화면 ---
@@ -96,7 +97,7 @@ def main_page():
             st.rerun()
         st.divider()
 
-    # 메인 탭 구성
+    # 메인 탭
     tabs = st.tabs(
         [
             "⏰ 출퇴근 관리",
@@ -107,9 +108,7 @@ def main_page():
         ]
     )
 
-    # --------------------------------------------------
-    # TAB 1: 출퇴근 관리
-    # --------------------------------------------------
+    # 1. 출퇴근 관리
     with tabs[0]:
         st.header("⏰ 출퇴근 기록")
         col1, col2 = st.columns(2)
@@ -159,9 +158,7 @@ def main_page():
         else:
             st.info("오늘 등록된 출퇴근 내역이 없습니다.")
 
-    # --------------------------------------------------
-    # TAB 2: 상품 마스터
-    # --------------------------------------------------
+    # 2. 상품 마스터
     with tabs[1]:
         st.header("📦 상품 마스터 관리")
 
@@ -201,9 +198,7 @@ def main_page():
         if prod_res.data:
             st.dataframe(pd.DataFrame(prod_res.data), use_container_width=True)
 
-    # --------------------------------------------------
-    # TAB 3: 거래처 관리
-    # --------------------------------------------------
+    # 3. 거래처 관리
     with tabs[2]:
         st.header("🤝 거래처 및 공급가율 관리")
 
@@ -211,10 +206,17 @@ def main_page():
             with st.form("new_client_form"):
                 c_name = st.text_input("거래처명 (필수)")
                 c_type = st.selectbox(
-                    "구분", ["BUYER", "VENDOR"], format_func=lambda x: "매출처(BUYER)" if x == "BUYER" else "매입처(VENDOR)"
+                    "구분",
+                    ["BUYER", "VENDOR"],
+                    format_func=lambda x: (
+                        "매출처(BUYER)" if x == "BUYER" else "매입처(VENDOR)"
+                    ),
                 )
                 c_rate = st.number_input(
-                    "기본 공급가율 (%)", min_value=0.0, max_value=200.0, value=100.0
+                    "기본 공급가율 (%)",
+                    min_value=0.0,
+                    max_value=200.0,
+                    value=100.0,
                 )
                 c_submit = st.form_submit_button("거래처 저장")
 
@@ -241,14 +243,15 @@ def main_page():
         if client_res.data:
             st.dataframe(pd.DataFrame(client_res.data), use_container_width=True)
 
-    # --------------------------------------------------
-    # TAB 4: 입출고/매출 관리
-    # --------------------------------------------------
+    # 4. 입출고/매출 관리
     with tabs[3]:
         st.header("📊 입출고 및 매출 등록")
 
         products_list = (
-            supabase.table("products").select("product_code, product_name").execute().data
+            supabase.table("products")
+            .select("product_code, product_name")
+            .execute()
+            .data
             or []
         )
         clients_list = (
@@ -256,20 +259,39 @@ def main_page():
         )
 
         with st.form("inventory_form"):
-            t_type = st.radio("거래 유형", ["IN", "OUT"], format_func=lambda x: "입고 (IN)" if x == "IN" else "출고 (OUT)")
+            t_type = st.radio(
+                "거래 유형",
+                ["IN", "OUT"],
+                format_func=lambda x: "입고 (IN)" if x == "IN" else "출고 (OUT)",
+            )
             p_select = st.selectbox(
                 "상품 선택",
                 options=[p["product_code"] for p in products_list],
-                format_func=lambda x: next(
-                    (f"{p['product_name']} ({p['product_code']})" for p in products_list if p["product_code"] == x), x
-                ) if products_list else "등록된 상품 없음",
+                format_func=(
+                    lambda x: next(
+                        (
+                            f"{p['product_name']} ({p['product_code']})"
+                            for p in products_list
+                            if p["product_code"] == x
+                        ),
+                        x,
+                    )
+                    if products_list
+                    else "등록된 상품 없음"
+                ),
             )
             c_select = st.selectbox(
                 "거래처 선택",
-                options=[c["client_name"] for c in clients_list] if clients_list else ["기타"],
+                options=(
+                    [c["client_name"] for c in clients_list]
+                    if clients_list
+                    else ["기타"]
+                ),
             )
             qty = st.number_input("수량", min_value=1, value=1)
-            unit_price = st.number_input("적용 단가 (엔화 JPY)", min_value=0.0, value=0.0)
+            unit_price = st.number_input(
+                "적용 단가 (엔화 JPY)", min_value=0.0, value=0.0
+            )
             t_submit = st.form_submit_button("거래 내역 저장")
 
             if t_submit and p_select:
@@ -287,7 +309,7 @@ def main_page():
                         }
                     ).execute()
 
-                    # 재고 수량 업데이트
+                    # 재고 자동 연동
                     prod_data = (
                         supabase.table("products")
                         .select("current_stock")
@@ -297,12 +319,14 @@ def main_page():
                     )
                     if prod_data:
                         curr_stock = prod_data[0]["current_stock"] or 0
-                        new_stock = curr_stock + qty if t_type == "IN" else curr_stock - qty
+                        new_stock = (
+                            curr_stock + qty if t_type == "IN" else curr_stock - qty
+                        )
                         supabase.table("products").update(
                             {"current_stock": new_stock}
                         ).eq("product_code", p_select).execute()
 
-                    st.success("입출고 거래 등록 및 재고 업데이트가 완료되었습니다.")
+                    st.success("입출고 거래 등록 및 재고 업데이트 완료!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"거래 등록 오류: {e}")
@@ -318,9 +342,7 @@ def main_page():
         if tx_res.data:
             st.dataframe(pd.DataFrame(tx_res.data), use_container_width=True)
 
-    # --------------------------------------------------
-    # TAB 5: 일정 캘린더
-    # --------------------------------------------------
+    # 5. 일정 캘린더
     with tabs[4]:
         st.header("📅 직원 일정 캘린더")
 
@@ -356,7 +378,7 @@ def main_page():
             st.dataframe(pd.DataFrame(events_res.data), use_container_width=True)
 
 
-# --- 7. 앱 실행 진입점 ---
+# --- 7. 앱 실행 ---
 if __name__ == "__main__":
     if not st.session_state.logged_in:
         login_page()
