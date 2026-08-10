@@ -1,53 +1,53 @@
 import streamlit as st
-from views import auth, dashboard, master_data, sales, inventory, invoice, attendance, calendar_leave, staff
+import hashlib
+from supabase import create_client, Client
 
-st.set_page_config(page_title="통합 ERP 시스템", layout="wide")
+# Supabase 연결 설정
+SUPABASE_URL = st.secrets["SUPABASE_URL"]  # 또는 "https://your-project.supabase.co"
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]  # 또는 "your-anon-key"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 브라우저 새로고침 시 자동 로그인 체크
-auth.check_auto_login()
+# 비밀번호 SHA-256 해시 함수
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+# 로그인 검증 함수
+def login(username, password):
+    hashed_pw = hash_password(password)
+    
+    # DB 조회
+    response = supabase.table("user_profiles") \
+        .select("*") \
+        .eq("username", username) \
+        .eq("password_hash", hashed_pw) \
+        .eq("status", "APPROVED") \
+        .eq("is_active", True) \
+        .execute()
+    
+    if response.data and len(response.data) > 0:
+        return response.data[0]  # 로그인 성공 시 사용자 정보 반환
+    return None
+
+# Streamlit UI
+st.title("시스템 로그인")
 
 if "user" not in st.session_state:
-    st.sidebar.title("🏢 로그인 / 회원가입")
-    auth_mode = st.sidebar.radio("선택", ["로그인", "회원가입"])
-    if auth_mode == "로그인":
-        auth.render_login()
-    else:
-        auth.render_signup()
-else:
-    user = st.session_state["user"]
-    role_label = {
-        "ADMIN": "👑 관리자",
-        "STAFF": "👔 사원",
-        "GUEST": "👀 방문자"
-    }.get(user["role"], user["role"])
-    
-    st.sidebar.title(f"{role_label} {user['full_name']}님")
-    
-    if st.sidebar.button("🚪 로그아웃"):
-        auth.clear_login_session()
-        st.rerun()
-        
-    menu_options = ["📊 경영 대시보드", "출퇴근 관리", "캘린더 & 휴무", "마스터 데이터", "영업 및 배송", "재고 관리", "청구 및 정산"]
-    
-    # 직원 관리 메뉴는 관리자만 노출
-    if user["role"] == "ADMIN":
-        menu_options.append("직원 승인 관리")
-        
-    menu = st.sidebar.radio("메뉴 선택", menu_options)
+    st.session_state.user = None
 
-    if menu == "📊 경영 대시보드":
-        dashboard.render()
-    elif menu == "출퇴근 관리":
-        attendance.render()
-    elif menu == "캘린더 & 휴무":
-        calendar_leave.render()
-    elif menu == "마스터 데이터":
-        master_data.render()
-    elif menu == "영업 및 배송":
-        sales.render()
-    elif menu == "재고 관리":
-        inventory.render()
-    elif menu == "청구 및 정산":
-        invoice.render()
-    elif menu == "직원 승인 관리":
-        staff.render()
+if st.session_state.user is None:
+    input_username = st.text_input("아이디", value="admin")
+    input_password = st.text_input("비밀번호", type="password", value="admin123!")
+    
+    if st.button("로그인"):
+        user_info = login(input_username, input_password)
+        if user_info:
+            st.session_state.user = user_info
+            st.success(f"{user_info['full_name']}님 환영합니다!")
+            st.rerun()
+        else:
+            st.error("아이디 또는 비밀번호가 올바르지 않거나 승인되지 않은 계정입니다.")
+else:
+    st.write(f"현재 로그인 계정: **{st.session_state.user['username']}** ({st.session_state.user['role']})")
+    if st.button("로그아웃"):
+        st.session_state.user = None
+        st.rerun()
