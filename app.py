@@ -1,15 +1,12 @@
 import hashlib
 from datetime import datetime
+from zoneinfo import ZoneInfo  # pytz 대신 zoneinfo 사용
 import pandas as pd
-import pytz
 import streamlit as st
 from supabase import create_client, Client
 
-# --- 1. 페이지 설정 ---
-st.set_page_config(page_title="GPClub Japan Mini ERP", page_icon="🏢", layout="wide")
-
 # 한국/일본 표준시 설정
-JST = pytz.timezone("Asia_Tokyo")
+JST = ZoneInfo("Asia/Tokyo")  # Asia_Tokyo 대신 Asia/Tokyo 표준 이름 사용
 
 
 # --- 2. Supabase 클라이언트 연결 ---
