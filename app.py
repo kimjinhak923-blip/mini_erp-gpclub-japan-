@@ -30,6 +30,24 @@ def check_auto_login():
 check_auto_login()
 
 # =========================================================
+# 🔍 [디버그 영역] DB 데이터 수신 상태 실시간 점검 (사이드바)
+# =========================================================
+st.sidebar.markdown("---")
+with st.sidebar.expander("🛠️ DB 연결 디버거", expanded=True):
+    try:
+        debug_res = supabase.table("user_profiles").select("*").execute()
+        st.caption("📌 DB 조회 결과:")
+        st.write(debug_res.data)
+        
+        if not debug_res.data:
+            st.warning("⚠️ DB에서 가져온 데이터가 빈 배열(`[]`)입니다.\n- Supabase RLS 권한 문제이거나\n- 테이블 데이터가 비어있습니다.")
+        else:
+            st.success(f"✅ DB 연동 성공! ({len(debug_res.data)}건 조회됨)")
+    except Exception as e:
+        st.error(f"❌ DB 연동 오류: {e}")
+st.sidebar.markdown("---")
+
+# =========================================================
 # 🔑 로그인 / 회원가입 화면
 # =========================================================
 if "user" not in st.session_state:
