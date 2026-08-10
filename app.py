@@ -3,6 +3,10 @@ from views import auth, dashboard, master_data, sales, inventory, invoice, atten
 
 st.set_page_config(page_title="통합 ERP 시스템", layout="wide")
 
+# app.py 의 로그인 처리 부분에 임시 추가
+test_res = supabase.table("user_profiles").select("*").execute()
+st.write("현재 DB에서 가져온 데이터:", test_res.data)
+
 # 브라우저 새로고침 시 자동 로그인 체크
 auth.check_auto_login()
 
