@@ -4,7 +4,9 @@ from supabase import create_client, Client
 
 st.set_page_config(page_title="통합 ERP 시스템", layout="wide")
 
+# =========================================================
 # 1. Supabase 클라이언트 설정 (st.secrets 사용)
+# =========================================================
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -16,7 +18,7 @@ except Exception as e:
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
-# 자동 로그인 세션 복구 함수
+# 세션 유지 체크
 def check_auto_login():
     if "user" not in st.session_state and "session_token" in st.query_params:
         user_id = st.query_params["session_token"]
@@ -30,7 +32,7 @@ def check_auto_login():
 check_auto_login()
 
 # =========================================================
-# 🔍 [디버그 영역] DB 데이터 수신 상태 실시간 점검 (사이드바)
+# 🔍 2. [디버그 영역] DB 연동 상태 및 데이터 확인 (사이드바)
 # =========================================================
 st.sidebar.markdown("---")
 with st.sidebar.expander("🛠️ DB 연결 디버거", expanded=True):
@@ -40,7 +42,7 @@ with st.sidebar.expander("🛠️ DB 연결 디버거", expanded=True):
         st.write(debug_res.data)
         
         if not debug_res.data:
-            st.warning("⚠️ DB에서 가져온 데이터가 빈 배열(`[]`)입니다.\n- Supabase RLS 권한 문제이거나\n- 테이블 데이터가 비어있습니다.")
+            st.warning("⚠️ DB에서 가져온 데이터가 빈 배열(`[]`)입니다.")
         else:
             st.success(f"✅ DB 연동 성공! ({len(debug_res.data)}건 조회됨)")
     except Exception as e:
@@ -48,13 +50,14 @@ with st.sidebar.expander("🛠️ DB 연결 디버거", expanded=True):
 st.sidebar.markdown("---")
 
 # =========================================================
-# 🔑 로그인 / 회원가입 화면
+# 🔑 3. 로그인 / 회원가입 화면
 # =========================================================
 if "user" not in st.session_state:
     st.title("🏢 통합 ERP 시스템")
     
     tab1, tab2 = st.tabs(["🔑 로그인", "📝 회원가입 신청"])
     
+    # --- 로그인 탭 ---
     with tab1:
         with st.form("login_form"):
             username = st.text_input("아이디", value="admin")
@@ -62,31 +65,44 @@ if "user" not in st.session_state:
             submitted = st.form_submit_button("로그인")
             
             if submitted:
-                hashed_pw = hash_password(password)
+                # 1) 입력 공백 제거
+                clean_username = username.strip()
+                clean_password = password.strip()
+                hashed_pw = hash_password(clean_password)
+                
                 try:
-                    res = supabase.table("user_profiles").select("*") \
-                        .eq("username", username) \
-                        .eq("password_hash", hashed_pw) \
+                    # 2) DB에서 해당 username 계정 조회
+                    res = supabase.table("user_profiles") \
+                        .select("*") \
+                        .eq("username", clean_username) \
                         .execute()
                     
-                    if res.data:
+                    if not res.data:
+                        st.error(f"❌ '{clean_username}' 아이디를 찾을 수 없습니다.")
+                    else:
                         user = res.data[0]
-                        if user.get("status") == "PENDING":
+                        db_hash = user.get("password_hash", "")
+                        
+                        # 3) 비밀번호 해시값 상세 비교
+                        if db_hash != hashed_pw:
+                            st.error("❌ 비밀번호가 일치하지 않습니다.")
+                            st.caption(f"💡 입력한 암호 해시: `{hashed_pw}`")
+                            st.caption(f"💡 DB 저장된 해시: `{db_hash}`")
+                        elif user.get("status") == "PENDING":
                             st.warning("⏳ 관리자 승인 대기 중인 계정입니다.")
-                        elif user.get("status") == "REJECTED":
-                            st.error("❌ 가입이 거절된 계정입니다.")
                         elif user.get("is_active") == False:
                             st.error("❌ 비활성화된 계정입니다.")
                         else:
+                            # 로그인 성공
                             st.session_state["user"] = user
                             st.query_params["session_token"] = user["id"]
-                            st.success(f"{user['full_name']}님 환영합니다!")
+                            st.success(f"🎉 {user['full_name']}님 로그인 성공!")
                             st.rerun()
-                    else:
-                        st.error("❌ 아이디 또는 비밀번호가 올바르지 않습니다.")
+
                 except Exception as e:
                     st.error(f"로그인 처리 중 오류 발생: {e}")
                     
+    # --- 회원가입 탭 ---
     with tab2:
         with st.form("signup_form"):
             new_username = st.text_input("신청할 아이디")
@@ -106,13 +122,16 @@ if "user" not in st.session_state:
             signup_submitted = st.form_submit_button("가입 신청")
             
             if signup_submitted and new_username and new_password and full_name:
-                hashed_pw = hash_password(new_password)
+                clean_new_username = new_username.strip()
+                clean_new_pw = new_password.strip()
+                hashed_pw = hash_password(clean_new_pw)
                 selected_role = role_map[role_display]
+                
                 try:
                     supabase.table("user_profiles").insert({
-                        "username": new_username,
+                        "username": clean_new_username,
                         "password_hash": hashed_pw,
-                        "full_name": full_name,
+                        "full_name": full_name.strip(),
                         "role": selected_role,
                         "status": "PENDING",
                         "is_active": True
@@ -122,7 +141,7 @@ if "user" not in st.session_state:
                     st.error(f"가입 신청 실패: {e}")
 
 # =========================================================
-# 📊 메인 시스템 화면 (로그인 성공 시)
+# 📊 4. 메인 시스템 화면 (로그인 성공 시)
 # =========================================================
 else:
     user = st.session_state["user"]
