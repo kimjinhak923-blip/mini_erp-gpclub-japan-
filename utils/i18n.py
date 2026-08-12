@@ -4,14 +4,12 @@ I18N = {
     "KO": {
         "title": "ERP 시스템",
         "lang_select": "언어 선택 / Language",
-        # 좌측 메뉴 카테고리
         "nav_dashboard": "📊 메인 대시보드",
         "nav_master": "⚙️ 마스터 관리 (제품/거래처)",
         "nav_order": "📦 출고/납품 작성 (최대 30개)",
         "nav_inventory": "🏢 창고별 재고 및 위탁 현황",
         "nav_hr": "⏰ 근태 및 인사 관리",
         
-        # 대시보드
         "dashboard_title": "📊 매출 Analytics & 대시보드",
         "tab_monthly": "📅 월별 조회 (연도/월)",
         "tab_detail": "🔍 상세 기간 조회 (프셋 선택)",
@@ -24,7 +22,6 @@ I18N = {
         "preset_1y": "1년",
         "preset_custom": "직접 범위 지정",
         
-        # 출고 / 납품
         "order_title": "📦 출고 및 납품 작성",
         "order_no": "발주번호",
         "partner_select": "거래처 선택",
@@ -141,7 +138,6 @@ def t(key):
     lang = get_lang()
     return I18N.get(lang, {}).get(key, I18N["KO"].get(key, key))
 
-# 언어 선택 드롭다운 (key 추가로 Duplicate Element ID 방지)
 def render_lang_selector():
     lang_options = {"한국어": "KO", "日本語": "JA", "English": "EN"}
     current_lang = get_lang()
@@ -151,13 +147,12 @@ def render_lang_selector():
         t("lang_select"),
         options=list(lang_options.keys()),
         index=list(lang_options.keys()).index(current_label),
-        key="global_sidebar_lang_selector"  # 고유 키 지정
+        key="unique_global_sidebar_lang_selector"
     )
     if lang_options[selected] != current_lang:
         st.session_state["lang"] = lang_options[selected]
         st.rerun()
 
-# 언어 선택 + 카테고리 사이드바 통합 출력
 def render_sidebar():
     st.sidebar.title(t("title"))
     render_lang_selector()
