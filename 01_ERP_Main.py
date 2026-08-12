@@ -4,13 +4,17 @@ import pytz
 import streamlit as st
 
 # ==========================================
-# 0. 최상단 배치 (Streamlit 규칙: 최우선 실행)
+# 0. 최상단 배치 (Telemetry 예외 안전 처리)
 # ==========================================
-st.set_page_config(
-    page_title="사내 통합 관리 시스템 (ERP)",
-    page_layout="wide",
-    initial_sidebar_state="expanded",
-)
+try:
+    st.set_page_config(
+        page_title="사내 통합 관리 시스템 (ERP)",
+        page_layout="wide",
+        initial_sidebar_state="expanded",
+    )
+except Exception:
+    # Telemetry 또는 세션 중복 호출로 인한 에러 발생 시 무시하고 진행
+    pass
 
 # ==========================================
 # 1. 세션 상태(데이터베이스 역할) 초기화
