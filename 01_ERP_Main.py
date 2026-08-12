@@ -2,14 +2,16 @@ import datetime
 import pytz
 import streamlit as st
 
-# ⚠️ 반드시 streamlit 관련 코드 중 가장 첫 번째로 실행되어야 합니다!
+# ⚠️ [중요] 반드시 import 직후, Streamlit 명령어 중 가장 첫 번째로 와야 합니다.
 st.set_page_config(
     page_title="사내 통합 관리 시스템 (ERP)",
     page_layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# 그 아래에 CSS 및 나머지 로직 실행
+# ----------------------------------------------------
+# 화면 폭 최대화 CSS
+# ----------------------------------------------------
 st.markdown("""
     <style>
         .main .block-container {
@@ -24,7 +26,43 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ... (이후 동일)
+# ----------------------------------------------------
+# 1. 다국어 딕셔너리 설정
+# ----------------------------------------------------
+LANG_PACK = {
+    "한국어": {
+        "title": "🏢 사내 통합 관리 시스템",
+        "lang_select": "🌐 언어 선택 / Language",
+        "user_info": "접속자",
+        "role_info": "권한",
+        "logout": "🚪 로그아웃",
+        "tokyo_time": "도쿄 기준 시간 (Asia/Tokyo)",
+    },
+    "日本語": {
+        "title": "🏢 社内統合管理システム",
+        "lang_select": "🌐 言語選択 / Language",
+        "user_info": "ログインユーザー",
+        "role_info": "権限",
+        "logout": "🚪 ログアウト",
+        "tokyo_time": "東京基準時間 (Asia/Tokyo)",
+    },
+    "English": {
+        "title": "🏢 Integrated ERP System",
+        "lang_select": "🌐 Select Language",
+        "user_info": "Logged in as",
+        "role_info": "Role",
+        "logout": "🚪 Logout",
+        "tokyo_time": "Tokyo Time (Asia/Tokyo)",
+    },
+}
+
+# ----------------------------------------------------
+# 2. 공통 세션 상태(데이터베이스) 초기화
+# ----------------------------------------------------
+if "lang" not in st.session_state:
+    st.session_state.lang = "한국어"
+
+# (이후 기존 코드 유지)
 
 # ==========================================
 # 0. 레이아웃 설정 및 가로 폭 최대화 CSS
