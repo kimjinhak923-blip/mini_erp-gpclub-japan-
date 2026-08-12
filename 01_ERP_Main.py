@@ -1,10 +1,7 @@
-# ==========================================
-# 0. Python 3.14 Streamlit 호환성 오류 패치
-# ==========================================
-import streamlit.runtime.metrics_util as _metrics_util
+import os
 
-# Python 3.14의 metrics_util 래퍼 함수 충돌 우회
-_metrics_util.gather_usage_stats = lambda func: func
+# Streamlit 사용량 수집(Telemetry) 완벽 비활성화 (오류 원인 제거)
+os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
 
 import datetime
 import pandas as pd
