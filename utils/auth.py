@@ -23,28 +23,39 @@ def render_login_page():
     render_lang_selector()
     
     with st.form("login_form"):
-        email = st.text_input(t("email"), placeholder="user@company.com")
+        email = st.text_input(t("email"), placeholder="user@company.com").strip()
         password = st.text_input(t("password"), type="password")
         remember_me = st.checkbox(t("remember_me"), value=True)
         
         submitted = st.form_submit_button(t("login_btn"))
         
         if submitted:
-            # 직원 마스터 또는 Supabase Auth 인증
-            res = supabase.table("employees").select("*").eq("email", email).eq("is_active", True).execute()
-            if res.data:
-                user = res.data[0]
-                # 자동 로그인용 고유 세션 토큰 생성 및 DB 저장
-                token = secrets.token_hex(16)
-                if remember_me:
-                    supabase.table("employees").update({"session_token": token}).eq("id", user["id"]).execute()
-                    st.query_params["session_token"] = token
+            if not email:
+                st.warning("이메일을 입력해 주세요.")
+                return
                 
-                st.session_state["user"] = user
-                st.success(t("login_success"))
-                st.rerun()
-            else:
-                st.error(t("login_error"))
+            try:
+                # DB 조회
+                res = supabase.table("employees").select("*").eq("email", email).eq("is_active", True).execute()
+                
+                if res.data and len(res.data) > 0:
+                    user = res.data[0]
+                    token = secrets.token_hex(16)
+                    
+                    if remember_me:
+                        try:
+                            supabase.table("employees").update({"session_token": token}).eq("id", user["id"]).execute()
+                            st.query_params["session_token"] = token
+                        except Exception as token_e:
+                            st.warning(f"자동 로그인 토큰 저장 중 경고: {token_e}")
+                    
+                    st.session_state["user"] = user
+                    st.success(t("login_success"))
+                    st.rerun()
+                else:
+                    st.error("등록되지 않은 이메일이거나 비활성화된 계정입니다.")
+            except Exception as e:
+                st.error(f"로그인 처리 중 DB 오류가 발생했습니다: {e}")
 
 def logout():
     """로그아웃 클릭 시에만 세션 토큰 제거 및 자동 로그인 해제"""
