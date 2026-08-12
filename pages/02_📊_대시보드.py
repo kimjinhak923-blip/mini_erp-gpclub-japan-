@@ -1,60 +1,42 @@
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="대시보드", page_layout="wide")
-st.markdown("<style>.main .block-container { max-width: 98% !important; }</style>", unsafe_allow_html=True)
-
-if st.session_state.get("logged_in_user") is None:
-    st.warning("로그인이 필요합니다.")
+user = st.session_state.get("logged_in_user")
+if not user:
+    st.warning("로그인이 필요한 페이지입니다. 메인 페이지에서 먼저 로그인해 주세요.")
     st.stop()
 
-def get_wh_stock(prod_code, wh_name):
-    return st.session_state.warehouse_stocks.get(f"{prod_code}_{wh_name}", 0)
+st.title("📊 통합 대시보드")
+st.markdown("---")
 
-st.header("📊 통합 대시보드")
-total_items = len(st.session_state.master_products)
-total_qty = 0
-total_val = 0
-wh_summary = {wh: 0 for wh in st.session_state.warehouses}
-
-for p in st.session_state.master_products:
-    p_code = p["code"]
-    p_price = p["price"]
-    for wh in st.session_state.warehouses:
-        qty = get_wh_stock(p_code, wh)
-        total_qty += qty
-        total_val += qty * p_price
-        wh_summary[wh] += qty
-
-m1, m2, m3 = st.columns(3)
-m1.metric("등록 상품 수", f"{total_items} 개")
-m2.metric("총 보유 재고량", f"{total_qty:,} 개")
-m3.metric("총 재고 금액 (매입가)", f"¥ {total_val:,}")
+c1, c2, c3, c4 = st.columns(4)
+with c1:
+    st.metric("총 마스터 상품", f"{len(st.session_state.master_products)} 개")
+with c2:
+    total_qty = sum(item["stock_qty"] for item in st.session_state.warehouse_stocks)
+    st.metric("총 재고 수량", f"{total_qty:,} 개")
+with c3:
+    st.metric("등록 거래처", f"{len(st.session_state.clients)} 개")
+with c4:
+    total_sales = sum(
+        log.get("total_amount", 0)
+        for log in st.session_state.stock_logs
+        if log.get("type") == "출고"
+    )
+    st.metric("누적 총 매출", f"¥{total_sales:,}")
 
 st.markdown("---")
-st.subheader("🏢 창고별 재고 현황")
-cols = st.columns(len(st.session_state.warehouses))
-for idx, wh in enumerate(st.session_state.warehouses):
-    cols[idx].info(f"**{wh}**\n\n### {wh_summary[wh]:,} 개")
+st.subheader("🏢 창고별 재고 분포")
+if st.session_state.warehouse_stocks:
+    df_stocks = pd.DataFrame(st.session_state.warehouse_stocks)
+    st.dataframe(df_stocks, use_container_width=True)
+else:
+    st.info("재고 데이터가 없습니다.")
 
 st.markdown("---")
-st.subheader("📦 상품별 보유 현황 (가로 통합 목록)")
-dash_data = []
-for p in st.session_state.master_products:
-    p_code = p["code"]
-    s_q = get_wh_stock(p_code, "SAGAWA")
-    l_q = get_wh_stock(p_code, "L&K")
-    d_q = get_wh_stock(p_code, "大吉商事")
-    tot = s_q + l_q + d_q
-    dash_data.append({
-        "상품코드": p_code,
-        "제품명": p["name"],
-        "카테고리": p["category"],
-        "매입단가": f"¥ {p['price']:,}",
-        "SAGAWA": f"{s_q:,}",
-        "L&K": f"{l_q:,}",
-        "大吉商事": f"{d_q:,}",
-        "총재고": f"{tot:,}",
-        "총재고금액": f"¥ {tot * p['price']:,}",
-    })
-st.dataframe(pd.DataFrame(dash_data), use_container_width=True)
+st.subheader("📦 전체 마스터 상품 목록")
+if st.session_state.master_products:
+    df_master = pd.DataFrame(st.session_state.master_products)
+    st.dataframe(df_master, use_container_width=True)
+else:
+    st.info("마스터 상품 데이터가 없습니다.")
