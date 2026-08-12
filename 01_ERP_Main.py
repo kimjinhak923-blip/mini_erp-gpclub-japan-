@@ -1,8 +1,14 @@
 import datetime
+# import pytz 대신 파이썬 기본 모듈 zoneinfo 사용
+from zoneinfo import ZoneInfo
 import pandas as pd
-import pytz
 import streamlit as st
 
+
+# --- 도쿄 기준 시간 계산 함수 ---
+def get_tokyo_time():
+    return datetime.datetime.now(ZoneInfo("Asia/Tokyo"))
+    
 # --- 페이지 기본 설정 ---
 st.set_page_config(
     page_title="사내 통합 관리 시스템 (ERP)", page_layout="wide", initial_sidebar_state="expanded"
