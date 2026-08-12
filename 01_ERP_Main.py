@@ -2,6 +2,30 @@ import datetime
 import pytz
 import streamlit as st
 
+# ⚠️ 반드시 streamlit 관련 코드 중 가장 첫 번째로 실행되어야 합니다!
+st.set_page_config(
+    page_title="사내 통합 관리 시스템 (ERP)",
+    page_layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# 그 아래에 CSS 및 나머지 로직 실행
+st.markdown("""
+    <style>
+        .main .block-container {
+            max-width: 98% !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-top: 1.5rem !important;
+        }
+        .stDataFrame, div[data-testid="stTable"] {
+            width: 100% !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# ... (이후 동일)
+
 # ==========================================
 # 0. 레이아웃 설정 및 가로 폭 최대화 CSS
 # ==========================================
