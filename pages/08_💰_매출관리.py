@@ -1,59 +1,46 @@
-import datetime
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="매출 관리", page_layout="wide")
-st.markdown("<style>.main .block-container { max-width: 98% !important; }</style>", unsafe_allow_html=True)
-
-if st.session_state.get("logged_in_user") is None:
-    st.warning("로그인이 필요합니다.")
+user = st.session_state.get("logged_in_user")
+if not user:
+    st.warning("로그인이 필요한 페이지입니다. 메인 페이지에서 먼저 로그인해 주세요.")
     st.stop()
 
-st.header("💰 매출 관리 (납품일/출고건 기준)")
-
-sf1, sf2, sf3, sf4 = st.columns([2, 2, 3, 3])
-s_filter_c = sf1.selectbox("거래처 선택 ", ["전체"] + [c["name"] for c in st.session_state.clients])
-s_filter_wh = sf2.selectbox("창고 선택 ", ["전체"] + st.session_state.warehouses)
-s_start_d = sf3.date_input("시작일 ", datetime.date.today() - datetime.timedelta(days=30))
-s_end_d = sf3.date_input("종료일 ", datetime.date.today())
-s_kw = sf4.text_input("검색어 (상품명 / 바코드 / 발주번호) ")
-
-sales_data = []
-for l in st.session_state.stock_logs:
-    if l["type"] != "출고":
-        continue
-    l_date = datetime.datetime.strptime(l["date"], "%Y-%m-%d").date()
-    if not (s_start_d <= l_date <= s_end_d):
-        continue
-    if s_filter_c != "전체" and l["client"] != s_filter_c:
-        continue
-    if s_filter_wh != "전체" and l["wh"] != s_filter_wh:
-        continue
-    if s_kw:
-        kw = s_kw.lower()
-        if (kw not in l["prod_name"].lower() and 
-            kw not in l.get("jan", "").lower() and 
-            kw not in l.get("po_no", "").lower()):
-            continue
-
-    sales_data.append({
-        "발주번호": l.get("po_no", "-"),
-        "납품일(출고일)": l["date"],
-        "거래처명": l["client"],
-        "출고창고": l["wh"],
-        "제품명": l["prod_name"],
-        "JAN/바코드": l.get("jan", "-"),
-        "발주량(수량)": l["qty"],
-        "공급가(엔 VAT-)": l["unit_price"],
-        "총매출액(공급가*발주량)": l["total_price"],
-        "거래방식": l["trade_type"],
-    })
-
+st.title("💰 매출 현황 및 분석")
 st.markdown("---")
-total_sales_sum = sum(item["총매출액(공급가*발주량)"] for item in sales_data)
-st.metric("📊 조회 기간 총 매출액", f"¥ {total_sales_sum:,}")
 
-if sales_data:
-    st.dataframe(pd.DataFrame(sales_data), use_container_width=True)
+out_logs = [
+    log for log in st.session_state.stock_logs if log.get("type") == "출고"
+]
+
+if not out_logs:
+    st.info("매출(출고) 내역이 아직 없습니다.")
 else:
-    st.info("조건에 부합하는 매출 데이터가 없습니다.")
+    df_sales = pd.DataFrame(out_logs)
+
+    total_rev = df_sales["total_amount"].sum()
+    total_qty = df_sales["qty"].sum()
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.metric("총 매출액 (JPY)", f"¥{total_rev:,}")
+    with c2:
+        st.metric("총 출고 수량", f"{total_qty:,} 개")
+
+    st.markdown("---")
+    st.subheader("🏢 거래처별 매출 합계")
+    cli_summary = (
+        df_sales.groupby("client_name")[["qty", "total_amount"]]
+        .sum()
+        .reset_index()
+    )
+    st.dataframe(cli_summary, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("📦 상품별 매출 합계")
+    prod_summary = (
+        df_sales.groupby(["jan_code", "product_name"])[["qty", "total_amount"]]
+        .sum()
+        .reset_index()
+    )
+    st.dataframe(prod_summary, use_container_width=True)
