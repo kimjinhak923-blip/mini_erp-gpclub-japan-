@@ -2,12 +2,17 @@ import datetime
 import pytz
 import streamlit as st
 
-# ⚠️ [필수] Streamlit 명령어 중 무조건 가장 첫 번째로 실행되어야 합니다.
-st.set_page_config(
-    page_title="사내 통합 관리 시스템 (ERP)",
-    page_layout="wide",
-    initial_sidebar_state="expanded",
-)
+# ----------------------------------------------------
+# 0. Streamlit 설정 (Cloud 환경 중복 호출 방지 적용)
+# ----------------------------------------------------
+try:
+    st.set_page_config(
+        page_title="사내 통합 관리 시스템 (ERP)",
+        page_layout="wide",
+        initial_sidebar_state="expanded",
+    )
+except Exception:
+    pass
 
 # 화면 가로폭 최대화 CSS 적용
 st.markdown("""
@@ -303,8 +308,8 @@ if st.sidebar.button(t["logout"], key="main_logout_btn"):
     st.rerun()
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📂 메뉴를 선택하세요")
-st.sidebar.info("왼쪽 상단의 화살표(> 버튼)를 눌러 멀티페이지 메뉴를 열어주세요.")
+st.sidebar.markdown("### 📂 메뉴 안내")
+st.sidebar.info("왼쪽 상단의 메뉴(> 버튼)에서 원하는 페이지로 이동하세요.")
 
 # ----------------------------------------------------
 # 4. 메인 대시보드 홈 화면
