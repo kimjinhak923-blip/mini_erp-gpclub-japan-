@@ -10,11 +10,11 @@ render_sidebar()
 
 st.title("⚙️ 마스터 정보 관리")
 
-tab_prod, tab_partner, tab_mapping = st.tabs(["📦 제품 마스터", "🏢 거래처 마스터", "🔗 거래처별 제품/공급가 등록"])
+tab_prod, tab_partner, tab_mapping, tab_stock = st.tabs(["📦 제품 마스터", "🏢 거래처 마스터", "🔗 거래처별 제품/공급가", "📥 창고별 초기 재고 등록"])
 
 # 1. 제품 마스터
 with tab_prod:
-    with st.form("add_product"):
+    with st.form("add_product_form"):
         st.subheader("새 제품 등록")
         c1, c2, c3, c4, c5 = st.columns(5)
         sku = c1.text_input("SKU 코드")
@@ -36,7 +36,7 @@ with tab_prod:
 
 # 2. 거래처 마스터
 with tab_partner:
-    with st.form("add_partner"):
+    with st.form("add_partner_form"):
         st.subheader("새 거래처 등록")
         c1, c2, c3, c4 = st.columns(4)
         code = c1.text_input("거래처 코드")
@@ -58,11 +58,11 @@ with tab_mapping:
         partner_map = {p["name"]: p["id"] for p in partners}
         prod_map = {f"[{p['sku']}] {p['name']}": p for p in prods}
         
-        sel_partner = st.selectbox("거래처 선택", list(partner_map.keys()))
-        sel_prod_label = st.selectbox("거래 가능 제품 선택", list(prod_map.keys()))
+        sel_partner = st.selectbox("거래처 선택", list(partner_map.keys()), key="m_map_partner")
+        sel_prod_label = st.selectbox("거래 가능 제품 선택", list(prod_map.keys()), key="m_map_prod")
         
         target_prod = prod_map[sel_prod_label]
-        custom_price = st.number_input("거래처 전용 공급가 (JPY, VAT별도)", value=float(target_prod["supply_price_jpy"]))
+        custom_price = st.number_input("거래처 전용 공급가 (JPY, VAT별도)", value=float(target_prod["supply_price_jpy"]), key="m_map_price")
         
         if st.button("거래처 제품 지정 등록"):
             supabase.table("partner_products").upsert({
@@ -71,3 +71,24 @@ with tab_mapping:
                 "custom_supply_price_jpy": custom_price
             }).execute()
             st.success("거래처별 제품 지정이 완료되었습니다.")
+
+# 4. 창고별 초기 재고 조정/입고
+with tab_stock:
+    st.subheader("창고별 제품 재고 수량 등록/조정")
+    warehouses = supabase.table("warehouses").select("*").execute().data or []
+    if warehouses and prods:
+        wh_map = {w["name"]: w["id"] for w in warehouses}
+        prod_map2 = {f"[{p['sku']}] {p['name']}": p["id"] for p in prods}
+        
+        c_wh, c_p, c_q = st.columns(3)
+        sel_wh = c_wh.selectbox("창고 선택", list(wh_map.keys()), key="m_stk_wh")
+        sel_p = c_p.selectbox("제품 선택", list(prod_map2.keys()), key="m_stk_prod")
+        stk_qty = c_q.number_input("재고 수량", min_value=0, value=100, key="m_stk_qty")
+        
+        if st.button("재고 수량 저장"):
+            supabase.table("inventory").upsert({
+                "warehouse_id": wh_map[sel_wh],
+                "product_id": prod_map2[sel_p],
+                "stock_qty": stk_qty
+            }).execute()
+            st.success("창고별 재고가 업데이트되었습니다.")
