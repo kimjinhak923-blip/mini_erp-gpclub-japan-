@@ -1,14 +1,11 @@
-import os
-
-# Streamlit 통계 수집(Telemetry) 비활성화 - 최상단 배치
-os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
-
 import datetime
 import pandas as pd
 import pytz
 import streamlit as st
 
-# --- 페이지 기본 설정 ---
+# ==========================================
+# 0. 최상단 배치 (Streamlit 규칙: 최우선 실행)
+# ==========================================
 st.set_page_config(
     page_title="사내 통합 관리 시스템 (ERP)",
     page_layout="wide",
