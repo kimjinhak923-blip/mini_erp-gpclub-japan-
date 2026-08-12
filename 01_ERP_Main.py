@@ -3,7 +3,7 @@ import pytz
 import streamlit as st
 
 # ----------------------------------------------------
-# 0. Streamlit 설정 (Cloud 환경 중복 호출 방지 적용)
+# 0. Streamlit 기본 설정
 # ----------------------------------------------------
 try:
     st.set_page_config(
@@ -14,7 +14,6 @@ try:
 except Exception:
     pass
 
-# 화면 가로폭 최대화 CSS 적용
 st.markdown("""
     <style>
         .main .block-container {
@@ -35,12 +34,11 @@ st.markdown("""
 LANG_PACK = {
     "한국어": {
         "title": "🏢 사내 통합 관리 시스템",
-        "lang_select": "🌐 언어 선택 / Language",
         "user_info": "접속자",
         "role_info": "권한",
         "logout": "🚪 로그아웃",
         "tokyo_time": "도쿄 기준 시간 (Asia/Tokyo)",
-        "login_req": "로그인이 필요합니다.",
+        "login_req": "시스템 이용을 위해 먼저 로그인해 주세요.",
         "id_ph": "사원번호 또는 아이디",
         "pw_ph": "비밀번호",
         "login_btn": "로그인",
@@ -53,12 +51,11 @@ LANG_PACK = {
     },
     "日本語": {
         "title": "🏢 社内統合管理システム",
-        "lang_select": "🌐 言語選択 / Language",
         "user_info": "ログインユーザー",
         "role_info": "権限",
         "logout": "🚪 ログアウト",
         "tokyo_time": "東京基準時間 (Asia/Tokyo)",
-        "login_req": "ログインしてください。",
+        "login_req": "システムを利用するにはログインしてください。",
         "id_ph": "社員番号またはID",
         "pw_ph": "パスワード",
         "login_btn": "ログイン",
@@ -71,7 +68,6 @@ LANG_PACK = {
     },
     "English": {
         "title": "🏢 Integrated ERP System",
-        "lang_select": "🌐 Select Language",
         "user_info": "Logged in as",
         "role_info": "Role",
         "logout": "🚪 Logout",
@@ -90,10 +86,13 @@ LANG_PACK = {
 }
 
 # ----------------------------------------------------
-# 2. 공통 세션 상태(데이터베이스 시뮬레이션) 초기화
+# 2. 공통 세션 상태 초기화 (로그인 유지 핵심)
 # ----------------------------------------------------
 if "lang" not in st.session_state:
     st.session_state.lang = "한국어"
+
+if "logged_in_user" not in st.session_state:
+    st.session_state.logged_in_user = None
 
 if "users" not in st.session_state:
     st.session_state.users = [
@@ -170,9 +169,6 @@ if "warehouse_stocks" not in st.session_state:
             "warehouse": "도쿄 본사 창고",
             "jan_code": "8801234567891",
             "product_name": "비타민 C 세럼 30ml",
-            "category": "스킨케어",
-            "capacity": "30ml",
-            "units_per_box": 36,
             "stock_qty": 800,
         },
         {
@@ -227,76 +223,94 @@ if "leave_records" not in st.session_state:
 if "company_holidays" not in st.session_state:
     st.session_state.company_holidays = []
 
-if "logged_in_user" not in st.session_state:
-    st.session_state.logged_in_user = None
+t = LANG_PACK[st.session_state.lang]
 
 # ----------------------------------------------------
-# 3. 사이드바 - 언어 및 로그인 상태 제어
+# 3. 비로그인 상태: 중앙 메인 화면에 로그인 / 회원가입 표시
 # ----------------------------------------------------
-st.sidebar.title("🌍 시스템 설정")
-selected_lang = st.sidebar.selectbox(
-    "🌐 언어 선택 / Language",
-    ["한국어", "日本語", "English"],
-    index=["한국어", "日本語", "English"].index(st.session_state.get("lang", "한국어")),
-)
-st.session_state.lang = selected_lang
-t = LANG_PACK[selected_lang]
-
-st.sidebar.markdown("---")
-
-# 로그인 안 된 상태
 if not st.session_state.logged_in_user:
     st.title(t["title"])
-    st.warning("🔒 " + t["login_req"])
-    st.sidebar.subheader("🔐 로그인 / 회원가입")
-    tab_l, tab_s = st.sidebar.tabs([t["login_tab"], t["signup_tab"]])
+    st.markdown("---")
 
-    with tab_l:
-        login_id = st.text_input(t["id_ph"], key="login_id_input")
-        login_pw = st.text_input(t["pw_ph"], type="password", key="login_pw_input")
-        if st.button(t["login_btn"], key="main_login_btn"):
-            found = False
-            for u in st.session_state.users:
-                if u["id"] == login_id and u["pw"] == login_pw:
-                    found = True
-                    if not u["approved"]:
-                        st.sidebar.error(t["not_approved"])
-                    else:
-                        st.session_state.logged_in_user = u
-                        st.sidebar.success(f"환영합니다, {u['name']}님!")
-                        st.rerun()
-                    break
-            if not found:
-                st.sidebar.error(t["login_fail"])
+    col_left, col_center, col_right = st.columns([1, 2, 1])
+    with col_center:
+        st.subheader("🔐 인증 센터")
+        tab_l, tab_s = st.tabs([t["login_tab"], t["signup_tab"]])
 
-    with tab_s:
-        new_id = st.text_input("아이디 (ID)", key="su_id")
-        new_pw = st.text_input("비밀번호 (PW)", type="password", key="su_pw")
-        new_name = st.text_input("이름 (성명)", key="su_name")
-        new_pos = st.selectbox("직급", st.session_state.positions, key="su_pos")
-        if st.button(t["signup_btn"], key="main_signup_btn"):
-            if not new_id or not new_pw or not new_name:
-                st.sidebar.error("모든 항목을 입력해주세요.")
-            else:
-                exists = any(u["id"] == new_id for u in st.session_state.users)
-                if exists:
-                    st.sidebar.error("이미 존재하는 아이디입니다.")
+        with tab_l:
+            login_id = st.text_input(t["id_ph"], key="main_login_id")
+            login_pw = st.text_input(t["pw_ph"], type="password", key="main_login_pw")
+            if st.button(t["login_btn"], key="main_login_btn", use_container_width=True):
+                found = False
+                for u in st.session_state.users:
+                    if u["id"] == login_id and u["pw"] == login_pw:
+                        found = True
+                        if not u["approved"]:
+                            st.error(t["not_approved"])
+                        else:
+                            st.session_state.logged_in_user = u
+                            st.rerun()
+                        break
+                if not found:
+                    st.error(t["login_fail"])
+
+        with tab_s:
+            new_id = st.text_input("아이디 (ID)", key="main_su_id")
+            new_pw = st.text_input("비밀번호 (PW)", type="password", key="main_su_pw")
+            new_name = st.text_input("이름 (성명)", key="main_su_name")
+            new_pos = st.selectbox("직급", st.session_state.positions, key="main_su_pos")
+            if st.button(t["signup_btn"], key="main_signup_btn", use_container_width=True):
+                if not new_id or not new_pw or not new_name:
+                    st.error("모든 항목을 입력해주세요.")
                 else:
-                    st.session_state.users.append({
-                        "id": new_id,
-                        "pw": new_pw,
-                        "name": new_name,
-                        "role": "일반 사용자",
-                        "position": new_pos,
-                        "approved": False,
-                        "hire_date": str(datetime.date.today()),
-                        "remaining_leave": 15,
-                    })
-                    st.sidebar.success(t["signup_success"])
+                    exists = any(u["id"] == new_id for u in st.session_state.users)
+                    if exists:
+                        st.error("이미 존재하는 아이디입니다.")
+                    else:
+                        st.session_state.users.append({
+                            "id": new_id,
+                            "pw": new_pw,
+                            "name": new_name,
+                            "role": "일반 사용자",
+                            "position": new_pos,
+                            "approved": False,
+                            "hire_date": str(datetime.date.today()),
+                            "remaining_leave": 15,
+                        })
+                        st.success(t["signup_success"])
 
-# 로그인 된 상태
+# ----------------------------------------------------
+# 4. 로그인 완료 상태: 사이드바 및 메인 대시보드
+# ----------------------------------------------------
 else:
     user = st.session_state.logged_in_user
+
+    # ===== [좌측 사이드바 1순위: 페이지 이동 메뉴] =====
+    st.sidebar.subheader("📌 페이지 이동 메뉴")
+    st.sidebar.page_link("pages/01_🕵️_마이페이지.py", label="01. 마이페이지")
+    st.sidebar.page_link("pages/02_📊_대시보드.py", label="02. 대시보드")
+    st.sidebar.page_link("pages/03_⏱️_출퇴근시스템.py", label="03. 출퇴근시스템")
+    st.sidebar.page_link("pages/04_📦_마스터상품_관리.py", label="04. 마스터상품 관리")
+    st.sidebar.page_link("pages/05_🤝_거래처_관리.py", label="05. 거래처 관리")
+    st.sidebar.page_link("pages/06_🔄_재고관리(입출고).py", label="06. 재고관리(입출고)")
+    st.sidebar.page_link("pages/07_📜_입출고_이력_조회.py", label="07. 입출고 이력 조회")
+    st.sidebar.page_link("pages/08_💰_매출관리.py", label="08. 매출관리")
+    st.sidebar.page_link("pages/09_📅_타임카드_캘린더.py", label="09. 타임카드 캘린더")
+    st.sidebar.page_link("pages/10_⚙️_시스템관리.py", label="10. 시스템관리")
+
+    st.sidebar.markdown("---")
+
+    # ===== [좌측 사이드바 2순위: 시스템 설정 & 정보] =====
+    st.sidebar.subheader("🌍 시스템 설정")
+    selected_lang = st.sidebar.selectbox(
+        "🌐 언어 선택 / Language",
+        ["한국어", "日本語", "English"],
+        index=["한국어", "日本語", "English"].index(st.session_state.get("lang", "한국어")),
+    )
+    if selected_lang != st.session_state.lang:
+        st.session_state.lang = selected_lang
+        st.rerun()
+
     st.sidebar.markdown(f"👤 **{t['user_info']}**: {user['name']} ({user['position']})")
     st.sidebar.markdown(f"🔑 **{t['role_info']}**: {user['role']}")
 
@@ -304,15 +318,12 @@ else:
     current_tokyo_time = datetime.datetime.now(tokyo_tz).strftime("%Y-%m-%d %H:%M:%S")
     st.sidebar.info(f"🕒 {t['tokyo_time']}\n\n**{current_tokyo_time}**")
 
-    if st.sidebar.button(t["logout"], key="main_logout_btn"):
+    # 명시적 로그아웃 클릭 시에만 세션 제거
+    if st.sidebar.button(t["logout"], key="main_logout_btn", use_container_width=True):
         st.session_state.logged_in_user = None
         st.rerun()
 
-    st.sidebar.markdown("---")
-
-    # ----------------------------------------------------
-    # 4. 메인 대시보드 홈 화면
-    # ----------------------------------------------------
+    # ===== [메인 영역: 대시보드] =====
     st.title(t["title"])
     st.markdown("---")
 
@@ -327,7 +338,7 @@ else:
     with col4:
         st.metric(label="총 입출고 이력", value=f"{len(st.session_state.stock_logs)} 건")
 
-    st.success(f"👋 **{user['name']}**님, 반갑습니다! 좌측 사이드바 상단의 페이지 메뉴에서 원하는 화면을 선택해 주세요.")
+    st.success(f"👋 **{user['name']}**님 환영합니다! 좌측 사이드바 상단의 페이지 메뉴를 이용해 바로 이동하실 수 있습니다.")
 
     st.markdown("---")
     st.markdown("### 📊 창고별 재고 현황 요약")
