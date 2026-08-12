@@ -141,7 +141,7 @@ def t(key):
     lang = get_lang()
     return I18N.get(lang, {}).get(key, I18N["KO"].get(key, key))
 
-# 언어 선택 드롭다운 (구버전 호환용)
+# 언어 선택 드롭다운 (key 추가로 Duplicate Element ID 방지)
 def render_lang_selector():
     lang_options = {"한국어": "KO", "日本語": "JA", "English": "EN"}
     current_lang = get_lang()
@@ -150,7 +150,8 @@ def render_lang_selector():
     selected = st.sidebar.selectbox(
         t("lang_select"),
         options=list(lang_options.keys()),
-        index=list(lang_options.keys()).index(current_label)
+        index=list(lang_options.keys()).index(current_label),
+        key="global_sidebar_lang_selector"  # 고유 키 지정
     )
     if lang_options[selected] != current_lang:
         st.session_state["lang"] = lang_options[selected]
