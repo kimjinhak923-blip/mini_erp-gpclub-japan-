@@ -13,15 +13,12 @@ st.title(t("dashboard_title"))
 
 tab_monthly, tab_detail = st.tabs([t("tab_monthly"), t("tab_detail")])
 
-# -------------------------------------------------------------------
-# [탭 1] 월별 조회 (연도 및 월만 선택)
-# -------------------------------------------------------------------
 with tab_monthly:
     col_y, col_m = st.columns(2)
     current_year = date.today().year
     
-    selected_year = col_y.selectbox(t("select_year"), range(current_year - 3, current_year + 2), index=3)
-    selected_month = col_m.selectbox(t("select_month"), range(1, 13), index=date.today().month - 1)
+    selected_year = col_y.selectbox(t("select_year"), range(current_year - 3, current_year + 2), index=3, key="dash_m_year")
+    selected_month = col_m.selectbox(t("select_month"), range(1, 13), index=date.today().month - 1, key="dash_m_month")
 
     start_date = date(selected_year, selected_month, 1)
     if selected_month == 12:
@@ -43,12 +40,9 @@ with tab_monthly:
     m1.metric(f"📅 {selected_year}-{selected_month:02d} 총 매출액 (JPY, VAT별도)", f"¥{tot_jpy:,.0f}")
     m2.metric(f"📦 총 출고 수량", f"{tot_qty:,} 개")
 
-# -------------------------------------------------------------------
-# [탭 2] 상세 기간 조회 (1일, 1주일, 1달, 1년, 직접 지정 프셋)
-# -------------------------------------------------------------------
 with tab_detail:
     st.subheader(t("tab_detail"))
-    preset = st.radio(t("preset_select"), [t("preset_1d"), t("preset_1w"), t("preset_1m"), t("preset_1y"), t("preset_custom")], horizontal=True)
+    preset = st.radio(t("preset_select"), [t("preset_1d"), t("preset_1w"), t("preset_1m"), t("preset_1y"), t("preset_custom")], horizontal=True, key="dash_preset")
 
     today = date.today()
     if preset == t("preset_1d"):
@@ -61,8 +55,8 @@ with tab_detail:
         d_start, d_end = today - timedelta(days=365), today
     else:
         c1, c2 = st.columns(2)
-        d_start = c1.date_input("시작일", value=today - timedelta(days=30))
-        d_end = c2.date_input("종료일", value=today)
+        d_start = c1.date_input("시작일", value=today - timedelta(days=30), key="dash_d_start")
+        d_end = c2.date_input("종료일", value=today, key="dash_d_end")
 
     detail_res = supabase.table("sales_orders") \
         .select("order_no, delivery_date, delivery_name, total_qty, total_amount_jpy, warehouses(name), partners(name)") \
@@ -71,7 +65,6 @@ with tab_detail:
         .execute()
 
     if detail_res.data:
-        df_detail = pd.DataFrame(detail_res.data)
-        st.dataframe(df_detail, use_container_width=True)
+        st.dataframe(pd.DataFrame(detail_res.data), use_container_width=True)
     else:
         st.info("해당 기간의 출고/납품 데이터가 없습니다.")
