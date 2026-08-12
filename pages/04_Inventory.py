@@ -11,7 +11,7 @@ render_sidebar()
 
 st.title("🏢 창고별 재고 및 大吉商事 위탁 현황")
 
-# 1. 大吉商事 위탁 재고 (매입단가/원가 KRW 기준 총 평가액)
+# 1. 大吉商事 위탁 평가액 (원가 KRW 기준)
 daikichi = supabase.table("warehouses").select("id").eq("name", "大吉商事").execute().data
 if daikichi:
     dk_id = daikichi[0]["id"]
@@ -25,12 +25,14 @@ if daikichi:
     dk_rows = []
     for row in dk_inv:
         p = row["products"]
+        if not p:
+            continue
         qty = row["stock_qty"]
-        cost = float(p["purchase_cost_krw"])
+        cost = float(p["purchase_cost_krw"] or 0)
         sum_krw = qty * cost
         tot_krw += sum_krw
         dk_rows.append({
-            "SKU": p["SKU"],
+            "SKU": p["sku"],
             "제품명": p["name"],
             "잔여 재고수량": qty,
             "매입단가(KRW)": f"₩{cost:,.0f}",
@@ -46,10 +48,9 @@ if daikichi:
 
 st.markdown("---")
 
-# 2. 전체 SKU별 월간 재고 변동 (지난달 잔여/입고/출고/이번달 잔여)
+# 2. 월간 재고 변동 (도쿄 날짜 기준)
 st.subheader("📦 전체 제품 월별 재고 흐름 (도쿄 날짜 기준)")
 
-# 도쿄 기준 이번달/지난달 산출
 today = date.today()
 first_day_this_month = date(today.year, today.month, 1)
 last_day_prev_month = first_day_this_month - timedelta(days=1)
@@ -60,7 +61,6 @@ prods = supabase.table("products").select("*").execute().data or []
 summary_rows = []
 
 for p in prods:
-    # 이번달 출고량 계산
     out_res = supabase.table("sales_order_items") \
         .select("qty, sales_orders!inner(delivery_date)") \
         .eq("product_id", p["id"]) \
@@ -69,18 +69,16 @@ for p in prods:
         
     this_month_out = sum(item["qty"] for item in out_res)
     
-    # 현재 창고 총 재고
     inv_res = supabase.table("inventory").select("stock_qty").eq("product_id", p["id"]).execute().data or []
     current_stock = sum(i["stock_qty"] for i in inv_res)
     
-    # 지난달 잔여 = 현재재고 + 이번달출고량 (역산)
     prev_stock = current_stock + this_month_out
 
     summary_rows.append({
         "SKU": p["sku"],
         "제품명": p["name"],
         f"지난달({last_day_prev_month.month}월) 잔여": prev_stock,
-        "이번달 입고수량": 0, # 입고 관리 모듈 연동 시 자동집계
+        "이번달 입고수량": 0,
         "이번달 출고수량": this_month_out,
         f"이번달({today.month}월) 잔여": current_stock
     })
