@@ -1,1284 +1,640 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>사내 통합 관리 시스템</title>
-    <style>
-        :root {
-            --primary-color: #2563eb;
-            --primary-hover: #1d4ed8;
-            --bg-color: #f8fafc;
-            --card-bg: #ffffff;
-            --text-color: #1e293b;
-            --text-muted: #64748b;
-            --border-color: #e2e8f0;
-            --success-color: #10b981;
-            --danger-color: #ef4444;
-            --warning-color: #f59e0b;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        /* 로그인 화면 */
-        #login-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #0f172a;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-        }
-
-        .login-card {
-            background: var(--card-bg);
-            padding: 2.5rem;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-            width: 100%;
-            max-width: 400px;
-        }
-
-        .login-card h2 {
-            margin-bottom: 1.5rem;
-            text-align: center;
-            color: var(--primary-color);
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.3rem;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 0.65rem;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 0.9rem;
-        }
-
-        .form-row {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .form-row .form-group {
-            flex: 1;
-        }
-
-        .btn {
-            display: inline-block;
-            width: 100%;
-            padding: 0.75rem;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-
-        .btn:hover {
-            background-color: var(--primary-hover);
-        }
-
-        .btn-secondary {
-            background-color: var(--text-muted);
-        }
-        .btn-secondary:hover {
-            background-color: #475569;
-        }
-
-        .btn-inline {
-            width: auto;
-            padding: 0.4rem 0.8rem;
-        }
-
-        /* 메인 레이아웃 */
-        #app-container {
-            display: none;
-            width: 100%;
-            height: 100%;
-            flex-direction: row;
-        }
-
-        /* 사이드바 */
-        sidebar {
-            width: 260px;
-            background-color: #1e293b;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            flex-shrink: 0;
-        }
-
-        .sidebar-header {
-            padding: 1.5rem;
-            font-size: 1.25rem;
-            font-weight: bold;
-            border-bottom: 1px solid #334155;
-            color: #60a5fa;
-        }
-
-        .nav-menu {
-            list-style: none;
-            padding: 1rem 0;
-            flex-grow: 1;
-            overflow-y: auto;
-        }
-
-        .nav-item {
-            padding: 0.85rem 1.5rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            font-size: 0.9rem;
-            color: #cbd5e1;
-            transition: background 0.2s;
-        }
-
-        .nav-item:hover, .nav-item.active {
-            background-color: #334155;
-            color: white;
-            font-weight: 600;
-        }
-
-        .user-info {
-            padding: 1rem 1.5rem;
-            border-top: 1px solid #334155;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.85rem;
-        }
-
-        /* 메인 콘텐츠 영역 */
-        main {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 2rem;
-            background-color: var(--bg-color);
-        }
-
-        .content-section {
-            display: none;
-        }
-
-        .content-section.active {
-            display: block;
-        }
-
-        /* 대시보드 상단 히어로 카드 */
-        .attendance-hero-card {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            color: white;
-            padding: 1.75rem;
-            border-radius: 12px;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .time-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #334155;
-            padding-bottom: 1rem;
-            margin-bottom: 1.2rem;
-        }
-
-        .server-time-title {
-            font-size: 0.85rem;
-            color: #94a3b8;
-        }
-
-        .server-time-clock {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #38bdf8;
-            letter-spacing: 1px;
-        }
-
-        .commute-action-area {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-
-        .commute-status-info {
-            display: flex;
-            gap: 1.5rem;
-        }
-
-        .status-box span {
-            display: block;
-            font-size: 0.8rem;
-            color: #94a3b8;
-        }
-
-        .status-box strong {
-            font-size: 1.1rem;
-            color: #f8fafc;
-        }
-
-        .btn-group-commute {
-            display: flex;
-            gap: 0.75rem;
-        }
-
-        .btn-commute {
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: bold;
-            border: none;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-        .btn-commute:active {
-            transform: scale(0.97);
-        }
-
-        .btn-in { background-color: var(--success-color); color: white; }
-        .btn-out { background-color: var(--danger-color); color: white; }
-
-        .rules-note {
-            font-size: 0.8rem;
-            color: #94a3b8;
-            margin-top: 0.75rem;
-            line-height: 1.4;
-        }
-
-        /* 테이블 및 일반 카드 스타일 */
-        .card {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 1.5rem;
-            border: 1px solid var(--border-color);
-            margin-bottom: 1.5rem;
-        }
-
-        .card-title {
-            font-size: 1.1rem;
-            font-weight: bold;
-            margin-bottom: 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .table-container {
-            width: 100%;
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 0.5rem;
-            font-size: 0.85rem;
-        }
-
-        th, td {
-            padding: 0.7rem 0.8rem;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-            white-space: nowrap;
-        }
-
-        th {
-            background-color: #f1f5f9;
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-
-        .badge {
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .badge-success { background: #d1fae5; color: #065f46; }
-        .badge-warning { background: #fef3c7; color: #92400e; }
-        .badge-danger  { background: #fee2e2; color: #991b1b; }
-
-        .grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-        }
-
-        @media (max-width: 1024px) {
-            .grid-2 { grid-template-columns: 1fr; }
-            #app-container { flex-direction: column; }
-            sidebar { width: 100%; }
-        }
-    </style>
-</head>
-<body>
-
-    <!-- 1. 로그인 화면 (테스트 계정 안내창 전면 제거) -->
-    <div id="login-screen">
-        <div class="login-card">
-            <h2>사내 관리 시스템</h2>
-            <form id="login-form" onsubmit="handleLogin(event)">
-                <div class="form-group">
-                    <label for="login-id">아이디</label>
-                    <input type="text" id="login-id" required placeholder="아이디를 입력하세요">
-                </div>
-                <div class="form-group">
-                    <label for="login-pw">비밀번호</label>
-                    <input type="password" id="login-pw" required placeholder="비밀번호를 입력하세요">
-                </div>
-                <button type="submit" class="btn">로그인</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- 2. 메인 애플리케이션 화면 -->
-    <div id="app-container">
-        <!-- 사이드바 -->
-        <sidebar>
-            <div class="sidebar-header">WORK MANAGER</div>
-            <ul class="nav-menu">
-                <li class="nav-item active" onclick="switchTab('dashboard')">대시보드</li>
-                <li class="nav-item" onclick="switchTab('attendance')">출퇴근 관리</li>
-                <li class="nav-item" onclick="switchTab('product-master')">마스터 상품 등록/관리</li>
-                <li class="nav-item" onclick="switchTab('purchase-order')">발주 등록/관리</li>
-                <li class="nav-item" onclick="switchTab('employees')">직원 계정 생성/관리</li>
-                <li class="nav-item" onclick="switchTab('schedule')">휴가 및 스케줄 관리</li>
-                <li class="nav-item" onclick="switchTab('permissions')">시스템 관리 (사용자 권한)</li>
-            </ul>
-            <div class="user-info">
-                <span id="current-user-display">관리자 (admin)</span>
-                <button class="btn btn-secondary btn-inline" onclick="handleLogout()" style="font-size:0.75rem;">로그아웃</button>
-            </div>
-        </sidebar>
-
-        <!-- 메인 콘텐츠 영역 -->
-        <main>
-
-            <!-- 로그인 후 첫 화면 최상단 도쿄 기준 서버시간 & 출퇴근 위젯 -->
-            <div class="attendance-hero-card">
-                <div class="time-header">
-                    <div>
-                        <div class="server-time-title">도쿄 기준 서버 시간 (Asia/Tokyo)</div>
-                        <div class="server-time-clock" id="tokyo-clock">2026. 08. 12. 00:00:00 JST</div>
-                    </div>
-                    <div>
-                        <span class="badge badge-success" id="today-date-badge">오늘</span>
-                    </div>
-                </div>
-                <div class="commute-action-area">
-                    <div class="commute-status-info">
-                        <div class="status-box">
-                            <span>출근 기록 시각</span>
-                            <strong id="display-clock-in">--:--:--</strong>
-                        </div>
-                        <div class="status-box">
-                            <span>퇴근 기록 시각</span>
-                            <strong id="display-clock-out">--:--:--</strong>
-                        </div>
-                        <div class="status-box">
-                            <span>인정 실근무시간</span>
-                            <strong id="display-work-hours" style="color: #60a5fa;">0시간 0분</strong>
-                        </div>
-                    </div>
-                    <div class="btn-group-commute">
-                        <button class="btn-commute btn-in" onclick="processClockIn()">출근하기</button>
-                        <button class="btn-commute btn-out" onclick="processClockOut()">퇴근하기</button>
-                    </div>
-                </div>
-                <div class="rules-note">
-                    ※ 근무시간 산정 기준: 출근 시각에 상관없이 근무시간은 <strong>09:00부터 계산</strong>됩니다. (정시퇴근 18:00 / 점심시간 12:00~13:00 차감)
-                </div>
-            </div>
-
-            <!-- 탭 1: 대시보드 -->
-            <section id="tab-dashboard" class="content-section active">
-                <div class="grid-2">
-                    <div class="card">
-                        <div class="card-title">오늘의 근무 상태 현황</div>
-                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">현재 접속 중인 계정의 오늘 출퇴근 및 근무시간 규칙 안내입니다.</p>
-                        <table>
-                            <tr>
-                                <th>구분</th>
-                                <th>시간 / 내용</th>
-                            </tr>
-                            <tr>
-                                <td>기준 시작 시간</td>
-                                <td>09:00 (고정 산정)</td>
-                            </tr>
-                            <tr>
-                                <td>정시 퇴근 시간</td>
-                                <td>18:00</td>
-                            </tr>
-                            <tr>
-                                <td>휴게(점심) 시간</td>
-                                <td>12:00 ~ 13:00 (1시간 자동 차감)</td>
-                            </tr>
-                        </table>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">시스템 주요 현황</div>
-                        <ul style="padding-left:1.2rem; font-size:0.85rem; line-height:1.8; color:var(--text-muted);">
-                            <li>마스터 상품 및 상세정보를 수시로 등록/관리할 수 있습니다.</li>
-                            <li>발주 등록 시 상세 수량, 단가, 납기일, 입고 창고 등을 지정합니다.</li>
-                            <li>시스템 문의는 관리자 계정(`admin`)을 통해 가능합니다.</li>
-                        </ul>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 탭 2: 출퇴근 관리 -->
-            <section id="tab-attendance" class="content-section">
-                <div class="card">
-                    <div class="card-title">출퇴근 이력 및 근무시간 조회</div>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>날짜</th>
-                                    <th>성명(ID)</th>
-                                    <th>실제 출근시각</th>
-                                    <th>산정 시작시각</th>
-                                    <th>퇴근시각</th>
-                                    <th>점심차감</th>
-                                    <th>총 인정 근무시간</th>
-                                </tr>
-                            </thead>
-                            <tbody id="attendance-history-table"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 탭 3: 마스터 상품 등록/관리 (상세 정보 포함) -->
-            <section id="tab-product-master" class="content-section">
-                <div class="grid-2">
-                    <div class="card">
-                        <div class="card-title">마스터 상품 및 상세 정보 등록</div>
-                        <form onsubmit="handleRegisterProduct(event)">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>상품 코드 *</label>
-                                    <input type="text" id="prod-code" required placeholder="예: PRD-1001">
-                                </div>
-                                <div class="form-group">
-                                    <label>상품명 *</label>
-                                    <input type="text" id="prod-name" required placeholder="예: 사무용 모니터 27인치">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>카테고리</label>
-                                    <select id="prod-category">
-                                        <option value="전자기기">전자기기</option>
-                                        <option value="사무용품">사무용품</option>
-                                        <option value="소모품">소모품</option>
-                                        <option value="가구/집기">가구/집기</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label>규격 / 단위</label>
-                                    <input type="text" id="prod-unit" placeholder="예: EA, Box, Set">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>기본 단가 (원)</label>
-                                    <input type="number" id="prod-price" required placeholder="예: 250000">
-                                </div>
-                                <div class="form-group">
-                                    <label>적정 재고량</label>
-                                    <input type="number" id="prod-stock-target" placeholder="예: 50">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>제조사 / 공급업체</label>
-                                    <input type="text" id="prod-vendor" placeholder="예: 삼성전자 / 알파유통">
-                                </div>
-                                <div class="form-group">
-                                    <label>원산지</label>
-                                    <input type="text" id="prod-origin" placeholder="예: 국산, 중국 등">
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>바코드 / 식별 번호</label>
-                                <input type="text" id="prod-barcode" placeholder="예: 8801234567890">
-                            </div>
-                            <div class="form-group">
-                                <label>상세 설명 및 특이사항</label>
-                                <textarea id="prod-desc" rows="3" placeholder="상품에 대한 상세 정보 및 보관 유의사항 입력"></textarea>
-                            </div>
-                            <button type="submit" class="btn">마스터 상품 등록</button>
-                        </form>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-title">등록된 마스터 상품 목록</div>
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>코드</th>
-                                        <th>상품명</th>
-                                        <th>카테고리</th>
-                                        <th>기본단가</th>
-                                        <th>공급업체</th>
-                                        <th>바코드/상세</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="product-master-table"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 탭 4: 발주 등록/관리 (상세 정보 포함) -->
-            <section id="tab-purchase-order" class="content-section">
-                <div class="grid-2">
-                    <div class="card">
-                        <div class="card-title">발주 상세 정보 등록</div>
-                        <form onsubmit="handleRegisterOrder(event)">
-                            <div class="form-group">
-                                <label>발주 대상 마스터 상품 선택 *</label>
-                                <select id="po-product-select" onchange="onSelectOrderProduct(this)" required>
-                                    <option value="">-- 마스터 상품을 선택하세요 --</option>
-                                </select>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>발주처 / 공급업체 *</label>
-                                    <input type="text" id="po-vendor" required placeholder="선택 시 자동 입력 또는 직접입력">
-                                </div>
-                                <div class="form-group">
-                                    <label>입고 예정 창고</label>
-                                    <select id="po-warehouse">
-                                        <option value="제1메인물류센터">제1메인물류센터</option>
-                                        <option value="제2부자재창고">제2부자재창고</option>
-                                        <option value="본사 사무실">본사 사무실</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>발주 수량 *</label>
-                                    <input type="number" id="po-qty" oninput="calculatePoTotal()" required placeholder="수량 입력">
-                                </div>
-                                <div class="form-group">
-                                    <label>발주 단가 (원) *</label>
-                                    <input type="number" id="po-unit-price" oninput="calculatePoTotal()" required placeholder="단가 입력">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>총 발주 금액 (자동계산)</label>
-                                    <input type="text" id="po-total-price" readonly style="background:#f1f5f9; font-weight:bold; color:var(--primary-color);" value="0 원">
-                                </div>
-                                <div class="form-group">
-                                    <label>납기 요청일 *</label>
-                                    <input type="date" id="po-delivery-date" required>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>발주 담당자</label>
-                                <input type="text" id="po-manager" placeholder="담당자 이름">
-                            </div>
-                            <div class="form-group">
-                                <label>상세 요청사항 및 비고</label>
-                                <textarea id="po-notes" rows="3" placeholder="포장 상태 요청, 배송 시 주의사항 등 입력"></textarea>
-                            </div>
-                            <button type="submit" class="btn">발주 등록 완료</button>
-                        </form>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-title">발주 등록 현황 및 상세 조회</div>
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>발주번호</th>
-                                        <th>상품명</th>
-                                        <th>공급업체</th>
-                                        <th>수량</th>
-                                        <th>총액</th>
-                                        <th>납기요청일</th>
-                                        <th>상태</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="purchase-order-table"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 탭 5: 직원 계정 생성 및 관리 -->
-            <section id="tab-employees" class="content-section">
-                <div class="grid-2">
-                    <div class="card">
-                        <div class="card-title">신규 직원 계정 생성</div>
-                        <form onsubmit="handleCreateEmployee(event)">
-                            <div class="form-group">
-                                <label>아이디</label>
-                                <input type="text" id="emp-id" required placeholder="예: user01">
-                            </div>
-                            <div class="form-group">
-                                <label>비밀번호</label>
-                                <input type="password" id="emp-pw" required placeholder="비밀번호 입력">
-                            </div>
-                            <div class="form-group">
-                                <label>이름</label>
-                                <input type="text" id="emp-name" required placeholder="예: 홍길동">
-                            </div>
-                            <div class="form-group">
-                                <label>부서</label>
-                                <input type="text" id="emp-dept" required placeholder="예: 개발팀">
-                            </div>
-                            <div class="form-group">
-                                <label>권한 역할</label>
-                                <select id="emp-role">
-                                    <option value="일반 직원">일반 직원</option>
-                                    <option value="시스템 관리자">시스템 관리자</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn">직원 계정 생성</button>
-                        </form>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-title">등록된 직원 목록</div>
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>아이디</th>
-                                        <th>이름</th>
-                                        <th>부서</th>
-                                        <th>권한</th>
-                                        <th>관리</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="employee-list-table"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 탭 6: 휴가 및 스케줄 관리 -->
-            <section id="tab-schedule" class="content-section">
-                <div class="grid-2">
-                    <div class="card">
-                        <div class="card-title">휴가 및 스케줄 신청</div>
-                        <form onsubmit="handleApplyLeave(event)">
-                            <div class="form-group">
-                                <label>신청 유형</label>
-                                <select id="leave-type">
-                                    <option value="연차">연차</option>
-                                    <option value="반차">반차</option>
-                                    <option value="병가">병가</option>
-                                    <option value="경조사">경조사</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>시작일</label>
-                                <input type="date" id="leave-start" required>
-                            </div>
-                            <div class="form-group">
-                                <label>종료일</label>
-                                <input type="date" id="leave-end" required>
-                            </div>
-                            <div class="form-group">
-                                <label>사유</label>
-                                <textarea id="leave-reason" rows="3" placeholder="사유를 입력하세요"></textarea>
-                            </div>
-                            <button type="submit" class="btn">스케줄 등록 신청</button>
-                        </form>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-title">휴가 신청 및 스케줄 현황</div>
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>신청자</th>
-                                        <th>유형</th>
-                                        <th>기간</th>
-                                        <th>상태</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="leave-list-table"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 탭 7: 시스템 관리 - 사용자 권한 관리 (전체 한글화 완료) -->
-            <section id="tab-permissions" class="content-section">
-                <div class="card">
-                    <div class="card-title">시스템 사용자 권한 설정</div>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
-                        각 역할 그룹별로 메뉴 접근 및 기능 실행 권한을 한국어로 명확히 관리합니다.
-                    </p>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>역할 그룹</th>
-                                    <th>접근 가능 메뉴 권한</th>
-                                    <th>출퇴근 기능 권한</th>
-                                    <th>권한 수정</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td><strong>시스템 관리자 (Administrator)</strong></td>
-                                    <td>전체 메뉴 (대시보드, 출퇴근, 마스터상품, 발주관리, 직원관리, 스케줄, 시스템관리)</td>
-                                    <td><span class="badge badge-success">전체 권한</span></td>
-                                    <td><button class="btn btn-secondary btn-inline" onclick="alert('최고 관리자 권한은 기본 설정 상태입니다.')">수정</button></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>일반 직원 (User)</strong></td>
-                                    <td>대시보드, 출퇴근 관리, 마스터 조회, 발주 등록, 휴가 신청</td>
-                                    <td><span class="badge badge-success">본인 출퇴근 가능</span></td>
-                                    <td><button class="btn btn-secondary btn-inline" onclick="alert('권한 설정 모달이 호출됩니다.')">권한 변경</button></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-        </main>
-    </div>
-
-    <script>
-        // --- 1. 초기 데이터 설정 (admin 계정 1개만 유일하게 남김) ---
-        let users = [
-            { id: 'admin', pw: 'admin123', name: '관리자', dept: '경영관리팀', role: '시스템 관리자' }
-        ];
-
-        let currentUser = null;
-
-        // 마스터 상품 데이터 저장소
-        let masterProducts = [];
-
-        // 발주 등록 데이터 저장소
-        let purchaseOrders = [];
-
-        // 출퇴근 기록 저장소
-        let attendanceRecords = [];
-
-        // 휴가/스케줄 기록 저장소
-        let leaveRecords = [];
-
-        // --- 2. 도쿄 기준 서버 시간 타이머 (Asia/Tokyo) ---
-        function updateTokyoClock() {
-            const now = new Date();
-            const options = {
-                timeZone: 'Asia/Tokyo',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            };
-            
-            const formatter = new Intl.DateTimeFormat('ko-KR', options);
-            const formattedParts = formatter.formatToParts(now);
-            
-            let y, m, d, hh, mm, ss;
-            formattedParts.forEach(p => {
-                if (p.type === 'year') y = p.value;
-                if (p.type === 'month') m = p.value;
-                if (p.type === 'day') d = p.value;
-                if (p.type === 'hour') hh = p.value;
-                if (p.type === 'minute') mm = p.value;
-                if (p.type === 'second') ss = p.value;
-            });
-
-            document.getElementById('tokyo-clock').innerText = `${y}.${m}.${d}. ${hh}:${mm}:${ss} JST`;
-            document.getElementById('today-date-badge').innerText = `${y}-${m}-${d}`;
-        }
-
-        setInterval(updateTokyoClock, 1000);
-        updateTokyoClock();
-
-        // --- 3. 로그인 및 로그아웃 ---
-        function handleLogin(e) {
-            e.preventDefault();
-            const inputId = document.getElementById('login-id').value.trim();
-            const inputPw = document.getElementById('login-pw').value.trim();
-
-            const found = users.find(u => u.id === inputId && u.pw === inputPw);
-
-            if (found) {
-                currentUser = found;
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('app-container').style.display = 'flex';
-                document.getElementById('current-user-display').innerText = `${currentUser.name} (${currentUser.id})`;
-                
-                // 로그인 후 담당자 필드 초기 세팅
-                document.getElementById('po-manager').value = currentUser.name;
-
-                renderTables();
-                updateCommuteDisplay();
-            } else {
-                alert('아이디 또는 비밀번호가 올바르지 않습니다.');
-            }
-        }
-
-        function handleLogout() {
-            currentUser = null;
-            document.getElementById('login-screen').style.display = 'flex';
-            document.getElementById('app-container').style.display = 'none';
-            document.getElementById('login-id').value = '';
-            document.getElementById('login-pw').value = '';
-        }
-
-        // --- 4. 탭 전환 ---
-        function switchTab(tabName) {
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active'));
-
-            const targetSection = document.getElementById(`tab-${tabName}`);
-            if (targetSection) targetSection.classList.add('active');
-
-            event.currentTarget.classList.add('active');
-        }
-
-        // --- 5. 출퇴근 처리 (규칙: 09시 고정 시작, 18시 정시퇴근, 12-13시 점심 차감) ---
-        function getTodayString() {
-            const options = { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' };
-            const parts = new Intl.DateTimeFormat('ko-KR', options).formatToParts(new Date());
-            let y, m, d;
-            parts.forEach(p => {
-                if (p.type === 'year') y = p.value;
-                if (p.type === 'month') m = p.value;
-                if (p.type === 'day') d = p.value;
-            });
-            return `${y}-${m}-${d}`;
-        }
-
-        function getTokyoCurrentTime() {
-            const options = { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
-            const parts = new Intl.DateTimeFormat('ko-KR', options).formatToParts(new Date());
-            let hh, mm, ss;
-            parts.forEach(p => {
-                if (p.type === 'hour') hh = p.value;
-                if (p.type === 'minute') mm = p.value;
-                if (p.type === 'second') ss = p.value;
-            });
-            return `${hh}:${mm}:${ss}`;
-        }
-
-        function processClockIn() {
-            if (!currentUser) return;
-            const today = getTodayString();
-            const nowTime = getTokyoCurrentTime();
-
-            let record = attendanceRecords.find(r => r.userId === currentUser.id && r.date === today);
-
-            if (record && record.clockIn) {
-                alert(`이미 오늘(${record.clockIn}) 출근 등록 완료되었습니다.`);
-                return;
-            }
-
-            if (!record) {
-                record = {
-                    date: today,
-                    userId: currentUser.id,
-                    userName: currentUser.name,
-                    clockIn: nowTime,
-                    clockOut: '--:--:--',
-                    calculatedHoursStr: '근무 중'
-                };
-                attendanceRecords.push(record);
-            } else {
-                record.clockIn = nowTime;
-            }
-
-            alert(`출근 완료! (실제 기록: ${nowTime} / 인정 시작: 09:00:00)`);
-            updateCommuteDisplay();
-            renderTables();
-        }
-
-        function processClockOut() {
-            if (!currentUser) return;
-            const today = getTodayString();
-            const nowTime = getTokyoCurrentTime();
-
-            let record = attendanceRecords.find(r => r.userId === currentUser.id && r.date === today);
-
-            if (!record || !record.clockIn) {
-                alert('출근 기록이 존재하지 않습니다. 먼저 출근을 눌러주세요.');
-                return;
-            }
-
-            record.clockOut = nowTime;
-            record.calculatedHoursStr = calculateWorkedHours(record.clockIn, record.clockOut);
-
-            alert(`퇴근 완료! (퇴근시각: ${nowTime})`);
-            updateCommuteDisplay();
-            renderTables();
-        }
-
-        function calculateWorkedHours(clockInStr, clockOutStr) {
-            if (!clockOutStr || clockOutStr === '--:--:--') return '근무 중';
-
-            const [outH, outM] = clockOutStr.split(':').map(Number);
-            
-            // 기준 09:00 (540분)
-            let startMinutes = 9 * 60;
-            let endMinutes = outH * 60 + outM;
-
-            if (endMinutes <= startMinutes) return '0시간 0분';
-
-            let totalMinutes = endMinutes - startMinutes;
-
-            // 점심시간 12:00~13:00 차감
-            if (endMinutes >= 780) { // 13:00 이후
-                totalMinutes -= 60;
-            } else if (endMinutes > 720) { // 12:00 ~ 13:00 사이
-                totalMinutes -= (endMinutes - 720);
-            }
-
-            if (totalMinutes < 0) totalMinutes = 0;
-
-            const workH = Math.floor(totalMinutes / 60);
-            const workM = totalMinutes % 60;
-
-            return `${workH}시간 ${workM}분`;
-        }
-
-        function updateCommuteDisplay() {
-            if (!currentUser) return;
-            const today = getTodayString();
-            const record = attendanceRecords.find(r => r.userId === currentUser.id && r.date === today);
-
-            if (record) {
-                document.getElementById('display-clock-in').innerText = record.clockIn || '--:--:--';
-                document.getElementById('display-clock-out').innerText = record.clockOut || '--:--:--';
-                document.getElementById('display-work-hours').innerText = record.calculatedHoursStr || '0시간 0분';
-            } else {
-                document.getElementById('display-clock-in').innerText = '--:--:--';
-                document.getElementById('display-clock-out').innerText = '--:--:--';
-                document.getElementById('display-work-hours').innerText = '0시간 0분';
-            }
-        }
-
-        // --- 6. 마스터 상품 등록 / 관리 ---
-        function handleRegisterProduct(e) {
-            e.preventDefault();
-            const code = document.getElementById('prod-code').value.trim();
-            const name = document.getElementById('prod-name').value.trim();
-            const category = document.getElementById('prod-category').value;
-            const unit = document.getElementById('prod-unit').value.trim();
-            const price = Number(document.getElementById('prod-price').value);
-            const stockTarget = document.getElementById('prod-stock-target').value;
-            const vendor = document.getElementById('prod-vendor').value.trim();
-            const origin = document.getElementById('prod-origin').value.trim();
-            const barcode = document.getElementById('prod-barcode').value.trim();
-            const desc = document.getElementById('prod-desc').value.trim();
-
-            if (masterProducts.find(p => p.code === code)) {
-                alert('이미 존재인 상품 코드입니다.');
-                return;
-            }
-
-            const newProduct = { code, name, category, unit, price, stockTarget, vendor, origin, barcode, desc };
-            masterProducts.push(newProduct);
-
-            alert(`마스터 상품 [${name}] 등록이 완료되었습니다.`);
-
-            // 폼 초기화
-            document.getElementById('prod-code').value = '';
-            document.getElementById('prod-name').value = '';
-            document.getElementById('prod-unit').value = '';
-            document.getElementById('prod-price').value = '';
-            document.getElementById('prod-stock-target').value = '';
-            document.getElementById('prod-vendor').value = '';
-            document.getElementById('prod-origin').value = '';
-            document.getElementById('prod-barcode').value = '';
-            document.getElementById('prod-desc').value = '';
-
-            updateProductSelectOptions();
-            renderTables();
-        }
-
-        function updateProductSelectOptions() {
-            const select = document.getElementById('po-product-select');
-            select.innerHTML = '<option value="">-- 마스터 상품을 선택하세요 --</option>';
-            masterProducts.forEach(p => {
-                const opt = document.createElement('option');
-                opt.value = p.code;
-                opt.innerText = `[${p.code}] ${p.name} (${p.price.toLocaleString()}원)`;
-                select.appendChild(opt);
-            });
-        }
-
-        function onSelectOrderProduct(selectElem) {
-            const code = selectElem.value;
-            const prod = masterProducts.find(p => p.code === code);
-            if (prod) {
-                document.getElementById('po-vendor').value = prod.vendor || '';
-                document.getElementById('po-unit-price').value = prod.price || 0;
-                calculatePoTotal();
-            }
-        }
-
-        // --- 7. 발주 등록 / 관리 ---
-        function calculatePoTotal() {
-            const qty = Number(document.getElementById('po-qty').value) || 0;
-            const price = Number(document.getElementById('po-unit-price').value) || 0;
-            const total = qty * price;
-            document.getElementById('po-total-price').value = total.toLocaleString() + ' 원';
-        }
-
-        function handleRegisterOrder(e) {
-            e.preventDefault();
-            const prodCode = document.getElementById('po-product-select').value;
-            const prod = masterProducts.find(p => p.code === prodCode);
-
-            if (!prod) {
-                alert('마스터 상품을 선택해주세요.');
-                return;
-            }
-
-            const vendor = document.getElementById('po-vendor').value.trim();
-            const warehouse = document.getElementById('po-warehouse').value;
-            const qty = Number(document.getElementById('po-qty').value);
-            const unitPrice = Number(document.getElementById('po-unit-price').value);
-            const deliveryDate = document.getElementById('po-delivery-date').value;
-            const manager = document.getElementById('po-manager').value.trim() || currentUser.name;
-            const notes = document.getElementById('po-notes').value.trim();
-
-            const orderNo = 'PO-' + Date.now().toString().slice(-6);
-
-            const newOrder = {
-                orderNo,
-                prodCode: prod.code,
-                prodName: prod.name,
-                vendor,
-                warehouse,
-                qty,
-                unitPrice,
-                totalPrice: qty * unitPrice,
-                deliveryDate,
-                manager,
-                notes,
-                status: '발주 요청 완료'
-            };
-
-            purchaseOrders.push(newOrder);
-            alert(`발주 등록 완료 (발주번호: ${orderNo})`);
-
-            // 폼 초기화
-            document.getElementById('po-product-select').value = '';
-            document.getElementById('po-vendor').value = '';
-            document.getElementById('po-qty').value = '';
-            document.getElementById('po-unit-price').value = '';
-            document.getElementById('po-total-price').value = '0 원';
-            document.getElementById('po-delivery-date').value = '';
-            document.getElementById('po-notes').value = '';
-
-            renderTables();
-        }
-
-        // --- 8. 직원 및 휴가 신청 ---
-        function handleCreateEmployee(e) {
-            e.preventDefault();
-            const id = document.getElementById('emp-id').value.trim();
-            const pw = document.getElementById('emp-pw').value.trim();
-            const name = document.getElementById('emp-name').value.trim();
-            const dept = document.getElementById('emp-dept').value.trim();
-            const role = document.getElementById('emp-role').value;
-
-            if (users.find(u => u.id === id)) {
-                alert('이미 존재인 아이디입니다.');
-                return;
-            }
-
-            users.push({ id, pw, name, dept, role });
-            alert(`신규 직원 [${name}] 계정이 성공적으로 생성되었습니다.`);
-
-            document.getElementById('emp-id').value = '';
-            document.getElementById('emp-pw').value = '';
-            document.getElementById('emp-name').value = '';
-            document.getElementById('emp-dept').value = '';
-
-            renderTables();
-        }
-
-        function deleteEmployee(userId) {
-            if (userId === 'admin') {
-                alert('기본 관리자 계정(admin)은 삭제할 수 없습니다.');
-                return;
-            }
-            if (confirm(`정말 ${userId} 계정을 삭제하시겠습니까?`)) {
-                users = users.filter(u => u.id !== userId);
-                renderTables();
-            }
-        }
-
-        function handleApplyLeave(e) {
-            e.preventDefault();
-            const type = document.getElementById('leave-type').value;
-            const start = document.getElementById('leave-start').value;
-            const end = document.getElementById('leave-end').value;
-
-            leaveRecords.push({
-                applicant: currentUser.name,
-                type,
-                period: `${start} ~ ${end}`,
-                status: '승인 대기'
-            });
-
-            alert('휴가 신청이 등록되었습니다.');
-            document.getElementById('leave-start').value = '';
-            document.getElementById('leave-end').value = '';
-            document.getElementById('leave-reason').value = '';
-
-            renderTables();
-        }
-
-        // --- 9. 화면 테이블 전체 렌더링 ---
-        function renderTables() {
-            // 1) 출퇴근 기록
-            const attTbody = document.getElementById('attendance-history-table');
-            attTbody.innerHTML = '';
-            if (attendanceRecords.length === 0) {
-                attTbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#94a3b8;">출퇴근 기록이 존재하지 않습니다.</td></tr>`;
-            } else {
-                attendanceRecords.forEach(r => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${r.date}</td>
-                        <td>${r.userName}(${r.userId})</td>
-                        <td>${r.clockIn}</td>
-                        <td><span class="badge badge-warning">09:00:00 (고정)</span></td>
-                        <td>${r.clockOut}</td>
-                        <td>1시간 (12~13시)</td>
-                        <td><strong>${r.calculatedHoursStr}</strong></td>
-                    `;
-                    attTbody.appendChild(tr);
-                });
-            }
-
-            // 2) 마스터 상품 목록
-            const prodTbody = document.getElementById('product-master-table');
-            prodTbody.innerHTML = '';
-            if (masterProducts.length === 0) {
-                prodTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#94a3b8;">등록된 마스터 상품이 없습니다.</td></tr>`;
-            } else {
-                masterProducts.forEach(p => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td><strong>${p.code}</strong></td>
-                        <td>${p.name}</td>
-                        <td>${p.category}</td>
-                        <td>${p.price.toLocaleString()}원</td>
-                        <td>${p.vendor || '-'}</td>
-                        <td><button class="btn btn-secondary btn-inline" onclick="alert('바코드: ${p.barcode || '없음'}\\n제조사/원산지: ${p.vendor || '-'}/${p.origin || '-'}\\n설명: ${p.desc || '없음'}')">상세보기</button></td>
-                    `;
-                    prodTbody.appendChild(tr);
-                });
-            }
-
-            // 3) 발주 목록
-            const poTbody = document.getElementById('purchase-order-table');
-            poTbody.innerHTML = '';
-            if (purchaseOrders.length === 0) {
-                poTbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#94a3b8;">등록된 발주 내역이 없습니다.</td></tr>`;
-            } else {
-                purchaseOrders.forEach(po => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td><strong>${po.orderNo}</strong></td>
-                        <td>${po.prodName}</td>
-                        <td>${po.vendor}</td>
-                        <td>${po.qty}</td>
-                        <td>${po.totalPrice.toLocaleString()}원</td>
-                        <td>${po.deliveryDate}</td>
-                        <td><span class="badge badge-success">${po.status}</span></td>
-                    `;
-                    poTbody.appendChild(tr);
-                });
-            }
-
-            // 4) 직원 목록
-            const empTbody = document.getElementById('employee-list-table');
-            empTbody.innerHTML = '';
-            users.forEach(u => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${u.id}</td>
-                    <td>${u.name}</td>
-                    <td>${u.dept}</td>
-                    <td><span class="badge ${u.role === '시스템 관리자' ? 'badge-danger' : 'badge-success'}">${u.role}</span></td>
-                    <td>
-                        ${u.id !== 'admin' ? `<button class="btn btn-secondary btn-inline" onclick="deleteEmployee('${u.id}')" style="background:#ef4444;">삭제</button>` : '-'}
-                    </td>
-                `;
-                empTbody.appendChild(tr);
-            });
-
-            // 5) 휴가 신청 목록
-            const leaveTbody = document.getElementById('leave-list-table');
-            leaveTbody.innerHTML = '';
-            if (leaveRecords.length === 0) {
-                leaveTbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#94a3b8;">신청 내역이 없습니다.</td></tr>`;
-            } else {
-                leaveRecords.forEach(l => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${l.applicant}</td>
-                        <td>${l.type}</td>
-                        <td>${l.period}</td>
-                        <td><span class="badge badge-warning">${l.status}</span></td>
-                    `;
-                    leaveTbody.appendChild(tr);
-                });
-            }
-        }
-    </script>
-</body>
-</html>
+import datetime
+import pandas as pd
+import pytz
+import streamlit as st
+
+# --- 페이지 기본 설정 ---
+st.set_page_config(
+    page_title="사내 통합 관리 시스템 (ERP)", page_layout="wide", initial_sidebar_state="expanded"
+)
+
+# ==========================================
+# 세션 상태(데이터베이스 역할) 초기화
+# ==========================================
+if "users" not in st.session_state:
+    st.session_state.users = [
+        {"id": "admin", "pw": "admin123", "name": "관리자", "dept": "경영관리팀", "role": "시스템 관리자"}
+    ]
+
+if "logged_in_user" not in st.session_state:
+    st.session_state.logged_in_user = None
+
+# 카테고리 동적 관리 목록
+if "categories" not in st.session_state:
+    st.session_state.categories = ["전자기기", "사무용품", "소모품", "가구/집기"]
+
+if "master_products" not in st.session_state:
+    st.session_state.master_products = []
+
+if "purchase_orders" not in st.session_state:
+    st.session_state.purchase_orders = []
+
+if "attendance_records" not in st.session_state:
+    st.session_state.attendance_records = []
+
+if "leave_records" not in st.session_state:
+    st.session_state.leave_records = []
+
+
+# --- 도쿄 기준 시간 계산 함수 ---
+def get_tokyo_time():
+    tokyo_tz = pytz.timezone("Asia/Tokyo")
+    return datetime.datetime.now(tokyo_tz)
+
+
+# --- 근무시간 계산 함수 (09:00 시작 고정 / 12:00~13:00 점심 차감) ---
+def calculate_work_hours(clock_in_str, clock_out_time):
+    if not clock_out_time:
+        return "근무 중"
+
+    start_minutes = 9 * 60  # 09:00
+    out_minutes = clock_out_time.hour * 60 + clock_out_time.minute
+
+    if out_minutes <= start_minutes:
+        return "0시간 0분"
+
+    total_minutes = out_minutes - start_minutes
+
+    # 점심시간 차감 (12:00 ~ 13:00)
+    lunch_start = 12 * 60
+    lunch_end = 13 * 60
+
+    if out_minutes >= lunch_end:
+        total_minutes -= 60
+    elif out_minutes > lunch_start:
+        total_minutes -= out_minutes - lunch_start
+
+    if total_minutes < 0:
+        total_minutes = 0
+
+    work_h = total_minutes // 60
+    work_m = total_minutes % 60
+    return f"{work_h}시간 {work_m}분"
+
+
+# ==========================================
+# 1. 로그인 화면
+# ==========================================
+if st.session_state.logged_in_user is None:
+    st.title("🔒 사내 통합 관리 시스템 로그인")
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.form("login_form"):
+            input_id = st.text_input("아이디")
+            input_pw = st.text_input("비밀번호", type="password")
+            submit = st.form_submit_button("로그인", use_container_width=True)
+
+            if submit:
+                user = next(
+                    (
+                        u
+                        for u in st.session_state.users
+                        if u["id"] == input_id and u["pw"] == input_pw
+                    ),
+                    None,
+                )
+                if user:
+                    st.session_state.logged_in_user = user
+                    st.success(f"{user['name']}님 환영합니다!")
+                    st.rerun()
+                else:
+                    st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
+
+# ==========================================
+# 2. 메인 ERP 시스템 애플리케이션
+# ==========================================
+else:
+    user = st.session_state.logged_in_user
+    is_admin = (
+        user["role"] == "시스템 관리자" or user["id"] == "admin"
+    )  # 관리자 여부 판별
+
+    # 사이드바 설정
+    st.sidebar.title("🏢 WORK MANAGER")
+    st.sidebar.write(f"**접속자:** {user['name']} ({user['id']})")
+    st.sidebar.write(
+        f"**권한:** {user['role']} {'👑 (관리자 권한)' if is_admin else ''}"
+    )
+
+    if st.sidebar.button("로그아웃", use_container_width=True):
+        st.session_state.logged_in_user = None
+        st.rerun()
+
+    menu = st.sidebar.radio(
+        "메뉴 이동",
+        [
+            "대시보드",
+            "출퇴근 관리",
+            "마스터 상품 등록/관리",
+            "발주 등록/관리",
+            "직원 계정 생성/관리",
+            "휴가 및 스케줄 관리",
+            "시스템 관리 (사용자 권한)",
+        ],
+    )
+
+    # 상단 도쿄 서버 시간 위젯 (모든 메뉴 공통)
+    tokyo_now = get_tokyo_time()
+    st.info(
+        f"🕒 **도쿄 기준 서버 시간 (Asia/Tokyo):** {tokyo_now.strftime('%Y-%m-%d %H:%M:%S')} JST"
+    )
+
+    # ------------------------------------------
+    # 탭 1: 대시보드
+    # ------------------------------------------
+    if menu == "대시보드":
+        st.header("📊 대시보드")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("⏱️ 오늘 나의 출퇴근 현황")
+            today_str = tokyo_now.strftime("%Y-%m-%d")
+            record = next(
+                (
+                    r
+                    for r in st.session_state.attendance_records
+                    if r["userId"] == user["id"] and r["date"] == today_str
+                ),
+                None,
+            )
+
+            clock_in_disp = record["clockIn"] if record else "--:--:--"
+            clock_out_disp = record["clockOut"] if record else "--:--:--"
+            work_hours_disp = record["calculatedHoursStr"] if record else "0시간 0분"
+
+            st.write(f"- **출근 기록 시각:** {clock_in_disp}")
+            st.write(f"- **퇴근 기록 시각:** {clock_out_disp}")
+            st.write(f"- **인정 실근무시간:** {work_hours_disp}")
+            st.caption(
+                "※ 근무시간 산정 기준: 출근 시각에 상관없이 09:00부터 계산되며, 12:00~13:00 점심시간 1시간이 자동 차감됩니다."
+            )
+
+            btn_col1, btn_col2 = st.columns(2)
+            with btn_col1:
+                if st.button("☀️ 출근하기", use_container_width=True):
+                    now_time_str = tokyo_now.strftime("%H:%M:%S")
+                    if record and record["clockIn"]:
+                        st.warning(
+                            f"이미 오늘({record['clockIn']}) 출근 처리되었습니다."
+                        )
+                    else:
+                        st.session_state.attendance_records.append({
+                            "date": today_str,
+                            "userId": user["id"],
+                            "userName": user["name"],
+                            "clockIn": now_time_str,
+                            "clockOut": "--:--:--",
+                            "calculatedHoursStr": "근무 중",
+                        })
+                        st.success(f"출근 완료! ({now_time_str})")
+                        st.rerun()
+
+            with btn_col2:
+                if st.button("🌙 퇴근하기", use_container_width=True):
+                    now_time = tokyo_now.time()
+                    now_time_str = tokyo_now.strftime("%H:%M:%S")
+                    if not record or not record["clockIn"]:
+                        st.error("출근 기록이 존재하지 않습니다.")
+                    else:
+                        record["clockOut"] = now_time_str
+                        record["calculatedHoursStr"] = calculate_work_hours(
+                            record["clockIn"], now_time
+                        )
+                        st.success(f"퇴근 완료! ({now_time_str})")
+                        st.rerun()
+
+        with col2:
+            st.subheader("📌 시스템 현황 요약")
+            st.metric("등록된 마스터 상품 수", f"{len(st.session_state.master_products)} 개")
+            st.metric("등록된 발주 건수", f"{len(st.session_state.purchase_orders)} 건")
+            st.metric("전체 등록 직원 수", f"{len(st.session_state.users)} 명")
+
+    # ------------------------------------------
+    # 탭 2: 출퇴근 관리
+    # ------------------------------------------
+    elif menu == "출퇴근 관리":
+        st.header("📅 출퇴근 이력 및 근무시간 조회")
+
+        if is_admin and st.session_state.attendance_records:
+            st.subheader("🛠️ 관리자 전용: 출퇴근 기록 삭제")
+            del_idx = st.number_input(
+                "삭제할 행 번호 (0부터 시작)",
+                min_value=0,
+                max_value=len(st.session_state.attendance_records) - 1,
+                step=1,
+            )
+            if st.button("해당 출퇴근 기록 삭제"):
+                del st.session_state.attendance_records[del_idx]
+                st.success("기록이 삭제되었습니다.")
+                st.rerun()
+
+        if st.session_state.attendance_records:
+            df_att = pd.DataFrame(st.session_state.attendance_records)
+            df_att.columns = [
+                "날짜",
+                "사용자ID",
+                "성명",
+                "실제 출근시각",
+                "퇴근시각",
+                "인정 근무시간",
+            ]
+            st.dataframe(df_att, use_container_width=True)
+        else:
+            st.info("출퇴근 기록이 없습니다.")
+
+    # ------------------------------------------
+    # 탭 3: 마스터 상품 등록/관리
+    # ------------------------------------------
+    elif menu == "마스터 상품 등록/관리":
+        st.header("📦 마스터 상품 등록 및 상세 관리")
+
+        # [관리자 전용] 카테고리 추가 영역
+        if is_admin:
+            with st.expander("👑 [관리자 전용] 카테고리 신규 추가 / 삭제"):
+                c_col1, c_col2 = st.columns([2, 1])
+                with c_col1:
+                    new_cat = st.text_input("새 카테고리명 입력")
+                with c_col2:
+                    st.write("")
+                    st.write("")
+                    if st.button("카테고리 추가"):
+                        if (
+                            new_cat
+                            and new_cat not in st.session_state.categories
+                        ):
+                            st.session_state.categories.append(new_cat)
+                            st.success(f"[{new_cat}] 카테고리가 추가되었습니다!")
+                            st.rerun()
+                        elif new_cat in st.session_state.categories:
+                            st.warning("이미 존재하는 카테고리입니다.")
+
+                st.write(
+                    f"**현재 등록된 카테고리 목록:** {', '.join(st.session_state.categories)}"
+                )
+
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            st.subheader("신규 마스터 상품 등록")
+            with st.form("product_form"):
+                p_code = st.text_input("상품 코드 * (예: PRD-1001)")
+                p_name = st.text_input("상품명 * (예: 사무용 모니터 27인치)")
+                p_category = st.selectbox(
+                    "카테고리 선택 *", st.session_state.categories
+                )
+                p_unit = st.text_input("규격 / 단위 (예: EA, Box)")
+                p_price = st.number_input(
+                    "기본 단가(원) *", min_value=0, step=1000
+                )
+                p_stock = st.number_input("적정 재고량", min_value=0, step=1)
+                p_vendor = st.text_input("제조사 / 공급업체")
+                p_origin = st.text_input("원산지")
+                p_barcode = st.text_input("바코드 / 식별번호")
+                p_desc = st.text_area("상세 설명 및 특이사항")
+
+                p_submit = st.form_submit_button("마스터 상품 등록")
+
+                if p_submit:
+                    if not p_code or not p_name:
+                        st.error("상품 코드와 상품명은 필수 입력 항목입니다.")
+                    elif any(
+                        p["code"] == p_code
+                        for p in st.session_state.master_products
+                    ):
+                        st.error("이미 존재하는 상품 코드입니다.")
+                    else:
+                        st.session_state.master_products.append({
+                            "code": p_code,
+                            "name": p_name,
+                            "category": p_category,
+                            "unit": p_unit,
+                            "price": p_price,
+                            "stock": p_stock,
+                            "vendor": p_vendor,
+                            "origin": p_origin,
+                            "barcode": p_barcode,
+                            "desc": p_desc,
+                        })
+                        st.success(f"마스터 상품 [{p_name}] 등록 완료!")
+                        st.rerun()
+
+        with col2:
+            st.subheader("등록된 마스터 상품 목록")
+
+            # [관리자 전용] 수정/삭제 조작
+            if is_admin and st.session_state.master_products:
+                with st.expander("👑 [관리자 전용] 상품 삭제"):
+                    prod_codes = [
+                        p["code"] for p in st.session_state.master_products
+                    ]
+                    del_prod_code = st.selectbox(
+                        "삭제할 상품 코드 선택", prod_codes
+                    )
+                    if st.button("선택 상품 삭제"):
+                        st.session_state.master_products = [
+                            p
+                            for p in st.session_state.master_products
+                            if p["code"] != del_prod_code
+                        ]
+                        st.success("상품이 삭제되었습니다.")
+                        st.rerun()
+
+            if st.session_state.master_products:
+                df_prod = pd.DataFrame(st.session_state.master_products)
+                df_prod.columns = [
+                    "상품코드",
+                    "상품명",
+                    "카테고리",
+                    "단위",
+                    "기본단가",
+                    "적정재고",
+                    "공급업체",
+                    "원산지",
+                    "바코드",
+                    "상세설명",
+                ]
+                st.dataframe(df_prod, use_container_width=True)
+            else:
+                st.info("등록된 마스터 상품이 없습니다.")
+
+    # ------------------------------------------
+    # 탭 4: 발주 등록/관리
+    # ------------------------------------------
+    elif menu == "발주 등록/관리":
+        st.header("📝 발주 상세 정보 등록 및 관리")
+
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            st.subheader("신규 발주 등록")
+            if not st.session_state.master_products:
+                st.warning("먼저 마스터 상품을 하나 이상 등록해주세요.")
+            else:
+                product_options = {
+                    f"[{p['code']}] {p['name']} ({p['price']:,}원)": p
+                    for p in st.session_state.master_products
+                }
+                selected_prod_label = st.selectbox(
+                    "발주 대상 마스터 상품 선택 *",
+                    list(product_options.keys()),
+                )
+                selected_prod = product_options[selected_prod_label]
+
+                with st.form("po_form"):
+                    po_vendor = st.text_input(
+                        "발주처 / 공급업체 *", value=selected_prod["vendor"]
+                    )
+                    po_warehouse = st.selectbox(
+                        "입고 예정 창고",
+                        ["제1메인물류센터", "제2부자재창고", "본사 사무실"],
+                    )
+                    po_qty = st.number_input(
+                        "발주 수량 *", min_value=1, value=10
+                    )
+                    po_unit_price = st.number_input(
+                        "발주 단가(원) *",
+                        min_value=0,
+                        value=int(selected_prod["price"]),
+                    )
+
+                    po_total = po_qty * po_unit_price
+                    st.write(f"**총 발주 금액:** {po_total:,} 원")
+
+                    po_delivery = st.date_input("납기 요청일")
+                    po_manager = st.text_input(
+                        "발주 담당자", value=user["name"]
+                    )
+                    po_notes = st.text_area("상세 요청사항 및 비고")
+
+                    po_submit = st.form_submit_button("발주 등록 완료")
+
+                    if po_submit:
+                        po_no = f"PO-{int(datetime.datetime.now().timestamp())}"
+                        st.session_state.purchase_orders.append({
+                            "orderNo": po_no,
+                            "prodCode": selected_prod["code"],
+                            "prodName": selected_prod["name"],
+                            "vendor": po_vendor,
+                            "warehouse": po_warehouse,
+                            "qty": po_qty,
+                            "unitPrice": po_unit_price,
+                            "totalPrice": po_total,
+                            "deliveryDate": str(po_delivery),
+                            "manager": po_manager,
+                            "notes": po_notes,
+                            "status": "발주 요청 완료",
+                        })
+                        st.success(f"발주가 성공적으로 등록되었습니다! (발주번호: {po_no})")
+                        st.rerun()
+
+        with col2:
+            st.subheader("발주 등록 내역 및 현황")
+
+            # [관리자 전용] 발주 상태 변경 / 삭제
+            if is_admin and st.session_state.purchase_orders:
+                with st.expander("👑 [관리자 전용] 발주 상태 변경 및 삭제"):
+                    po_nos = [
+                        po["orderNo"]
+                        for po in st.session_state.purchase_orders
+                    ]
+                    target_po_no = st.selectbox("관리할 발주번호 선택", po_nos)
+
+                    target_po = next(
+                        po
+                        for po in st.session_state.purchase_orders
+                        if po["orderNo"] == target_po_no
+                    )
+
+                    p_col1, p_col2 = st.columns(2)
+                    with p_col1:
+                        new_status = st.selectbox(
+                            "발주 상태 변경",
+                            ["발주 요청 완료", "승인 완료", "입고 완료", "발주 취소"],
+                            index=0,
+                        )
+                        if st.button("상태 반영"):
+                            target_po["status"] = new_status
+                            st.success(f"상태가 [{new_status}](으)로 변경되었습니다.")
+                            st.rerun()
+                    with p_col2:
+                        st.write("")
+                        st.write("")
+                        if st.button("해당 발주 삭제"):
+                            st.session_state.purchase_orders = [
+                                po
+                                for po in st.session_state.purchase_orders
+                                if po["orderNo"] != target_po_no
+                            ]
+                            st.success("발주 내역이 삭제되었습니다.")
+                            st.rerun()
+
+            if st.session_state.purchase_orders:
+                df_po = pd.DataFrame(st.session_state.purchase_orders)
+                df_po.columns = [
+                    "발주번호",
+                    "상품코드",
+                    "상품명",
+                    "공급업체",
+                    "입고창고",
+                    "수량",
+                    "단가",
+                    "총금액",
+                    "납기요청일",
+                    "담당자",
+                    "비고/요청사항",
+                    "진행상태",
+                ]
+                st.dataframe(df_po, use_container_width=True)
+            else:
+                st.info("등록된 발주 내역이 없습니다.")
+
+    # ------------------------------------------
+    # 탭 5: 직원 계정 생성/관리
+    # ------------------------------------------
+    elif menu == "직원 계정 생성/관리":
+        st.header("👥 직원 계정 생성 및 관리")
+
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            st.subheader("신규 직원 계정 생성")
+            with st.form("emp_form"):
+                e_id = st.text_input("아이디 *")
+                e_pw = st.text_input("비밀번호 *", type="password")
+                e_name = st.text_input("이름 *")
+                e_dept = st.text_input("부서 *")
+                e_role = st.selectbox("권한 역할", ["일반 직원", "시스템 관리자"])
+
+                e_submit = st.form_submit_button("직원 계정 생성")
+
+                if e_submit:
+                    if not e_id or not e_pw or not e_name:
+                        st.error("필수 항목을 모두 입력해주세요.")
+                    elif any(u["id"] == e_id for u in st.session_state.users):
+                        st.error("이미 존재하는 아이디입니다.")
+                    else:
+                        st.session_state.users.append({
+                            "id": e_id,
+                            "pw": e_pw,
+                            "name": e_name,
+                            "dept": e_dept,
+                            "role": e_role,
+                        })
+                        st.success(f"신규 직원 [{e_name}] 계정 생성 완료!")
+                        st.rerun()
+
+        with col2:
+            st.subheader("등록된 직원 목록")
+
+            # [관리자 전용] 계정 삭제
+            if is_admin and len(st.session_state.users) > 1:
+                with st.expander("👑 [관리자 전용] 직원 계정 삭제"):
+                    user_ids = [
+                        u["id"]
+                        for u in st.session_state.users
+                        if u["id"] != "admin"
+                    ]
+                    if user_ids:
+                        del_u_id = st.selectbox("삭제할 직원 ID", user_ids)
+                        if st.button("해당 직원 계정 삭제"):
+                            st.session_state.users = [
+                                u
+                                for u in st.session_state.users
+                                if u["id"] != del_u_id
+                            ]
+                            st.success("계정이 삭제되었습니다.")
+                            st.rerun()
+
+            df_users = pd.DataFrame(st.session_state.users)[
+                ["id", "name", "dept", "role"]
+            ]
+            df_users.columns = ["아이디", "이름", "부서", "권한 역할"]
+            st.dataframe(df_users, use_container_width=True)
+
+    # ------------------------------------------
+    # 탭 6: 휴가 및 스케줄 관리
+    # ------------------------------------------
+    elif menu == "휴가 및 스케줄 관리":
+        st.header("🌴 휴가 및 스케줄 관리")
+
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            st.subheader("휴가 / 스케줄 신청")
+            with st.form("leave_form"):
+                l_type = st.selectbox("신청 유형", ["연차", "반차", "병가", "경조사"])
+                l_start = st.date_input("시작일")
+                l_end = st.date_input("종료일")
+                l_reason = st.text_area("사유")
+
+                l_submit = st.form_submit_button("신청서 제출")
+
+                if l_submit:
+                    st.session_state.leave_records.append({
+                        "applicant": user["name"],
+                        "type": l_type,
+                        "period": f"{l_start} ~ {l_end}",
+                        "reason": l_reason,
+                        "status": "승인 대기",
+                    })
+                    st.success("휴가 신청이 완료되었습니다.")
+                    st.rerun()
+
+        with col2:
+            st.subheader("휴가 신청 현황 및 결재")
+
+            # [관리자 전용] 휴가 승인 / 반려
+            if is_admin and st.session_state.leave_records:
+                with st.expander("👑 [관리자 전용] 휴가 결재 처리"):
+                    leave_indices = list(
+                        range(len(st.session_state.leave_records))
+                    )
+                    sel_leave_idx = st.selectbox(
+                        "결재할 휴가 신청 번호 (행 순서)", leave_indices
+                    )
+
+                    l_col1, l_col2 = st.columns(2)
+                    with l_col1:
+                        if st.button("✅ 승인"):
+                            st.session_state.leave_records[sel_leave_idx][
+                                "status"
+                            ] = "승인 완료"
+                            st.success("휴가가 승인되었습니다.")
+                            st.rerun()
+                    with l_col2:
+                        if st.button("❌ 반려"):
+                            st.session_state.leave_records[sel_leave_idx][
+                                "status"
+                            ] = "반려"
+                            st.error("휴가가 반려되었습니다.")
+                            st.rerun()
+
+            if st.session_state.leave_records:
+                df_leave = pd.DataFrame(st.session_state.leave_records)
+                df_leave.columns = ["신청자", "유형", "기간", "사유", "결재상태"]
+                st.dataframe(df_leave, use_container_width=True)
+            else:
+                st.info("신청된 휴가 내역이 없습니다.")
+
+    # ------------------------------------------
+    # 탭 7: 시스템 관리 (사용자 권한)
+    # ------------------------------------------
+    elif menu == "시스템 관리 (사용자 권한)":
+        st.header("⚙️ 시스템 사용자 권한 설정")
+        st.write("각 역할 그룹별 메뉴 및 기능 권한 현황입니다.")
+
+        perm_data = [
+            {
+                "역할 그룹": "시스템 관리자 (Administrator)",
+                "접근 가능 메뉴": "전체 메뉴 (대시보드, 출퇴근, 마스터, 발주, 직원관리, 스케줄, 시스템관리)",
+                "관리자 풀 권한": "카테고리 추가, 상품/발주/직원/출퇴근 삭제 및 휴가 결재 승인/반려 가능",
+            },
+            {
+                "역할 그룹": "일반 직원 (User)",
+                "접근 가능 메뉴": "대시보드, 출퇴근 관리, 마스터 상품 조회, 발주 등록, 휴가 신청",
+                "관리자 풀 권한": "조회 및 본인 데이터 생성만 가능 (수정/삭제/결재 불가)",
+            },
+        ]
+        st.table(pd.DataFrame(perm_data))
