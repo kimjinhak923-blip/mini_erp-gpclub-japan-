@@ -1,23 +1,12 @@
+import os
+
+# Streamlit 통계 수집(Telemetry) 비활성화 - 최상단 배치
+os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
+
 import datetime
 import pandas as pd
 import pytz
 import streamlit as st
-
-# ==========================================
-# 0. Streamlit Metrics 에러 완전 무력화 패치
-# ==========================================
-try:
-    import streamlit.runtime.metrics_util as _mu
-
-    def _noop_decorator(func):
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    _mu.gather_usage_stats = _noop_decorator
-except Exception:
-    pass
 
 # --- 페이지 기본 설정 ---
 st.set_page_config(
