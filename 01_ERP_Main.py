@@ -1,31 +1,40 @@
+# ==========================================
+# 0. Python 3.14 Streamlit 호환성 오류 패치
+# ==========================================
+import streamlit.runtime.metrics_util as _metrics_util
+
+# Python 3.14의 metrics_util 래퍼 함수 충돌 우회
+_metrics_util.gather_usage_stats = lambda func: func
+
 import datetime
-# import pytz 대신 파이썬 기본 모듈 zoneinfo 사용
-from zoneinfo import ZoneInfo
 import pandas as pd
+import pytz
 import streamlit as st
 
-
-# --- 도쿄 기준 시간 계산 함수 ---
-def get_tokyo_time():
-    return datetime.datetime.now(ZoneInfo("Asia/Tokyo"))
-    
 # --- 페이지 기본 설정 ---
 st.set_page_config(
-    page_title="사내 통합 관리 시스템 (ERP)", page_layout="wide", initial_sidebar_state="expanded"
+    page_title="사내 통합 관리 시스템 (ERP)",
+    page_layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 # ==========================================
-# 세션 상태(데이터베이스 역할) 초기화
+# 1. 세션 상태(데이터베이스 역할) 초기화
 # ==========================================
 if "users" not in st.session_state:
     st.session_state.users = [
-        {"id": "admin", "pw": "admin123", "name": "관리자", "dept": "경영관리팀", "role": "시스템 관리자"}
+        {
+            "id": "admin",
+            "pw": "admin123",
+            "name": "관리자",
+            "dept": "경영관리팀",
+            "role": "시스템 관리자",
+        }
     ]
 
 if "logged_in_user" not in st.session_state:
     st.session_state.logged_in_user = None
 
-# 카테고리 동적 관리 목록
 if "categories" not in st.session_state:
     st.session_state.categories = ["전자기기", "사무용품", "소모품", "가구/집기"]
 
@@ -61,7 +70,6 @@ def calculate_work_hours(clock_in_str, clock_out_time):
 
     total_minutes = out_minutes - start_minutes
 
-    # 점심시간 차감 (12:00 ~ 13:00)
     lunch_start = 12 * 60
     lunch_end = 13 * 60
 
@@ -79,7 +87,7 @@ def calculate_work_hours(clock_in_str, clock_out_time):
 
 
 # ==========================================
-# 1. 로그인 화면
+# 2. 로그인 화면
 # ==========================================
 if st.session_state.logged_in_user is None:
     st.title("🔒 사내 통합 관리 시스템 로그인")
@@ -108,13 +116,11 @@ if st.session_state.logged_in_user is None:
                     st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
 
 # ==========================================
-# 2. 메인 ERP 시스템 애플리케이션
+# 3. 메인 ERP 시스템 애플리케이션
 # ==========================================
 else:
     user = st.session_state.logged_in_user
-    is_admin = (
-        user["role"] == "시스템 관리자" or user["id"] == "admin"
-    )  # 관리자 여부 판별
+    is_admin = user["role"] == "시스템 관리자" or user["id"] == "admin"
 
     # 사이드바 설정
     st.sidebar.title("🏢 WORK MANAGER")
@@ -140,7 +146,6 @@ else:
         ],
     )
 
-    # 상단 도쿄 서버 시간 위젯 (모든 메뉴 공통)
     tokyo_now = get_tokyo_time()
     st.info(
         f"🕒 **도쿄 기준 서버 시간 (Asia/Tokyo):** {tokyo_now.strftime('%Y-%m-%d %H:%M:%S')} JST"
@@ -256,7 +261,6 @@ else:
     elif menu == "마스터 상품 등록/관리":
         st.header("📦 마스터 상품 등록 및 상세 관리")
 
-        # [관리자 전용] 카테고리 추가 영역
         if is_admin:
             with st.expander("👑 [관리자 전용] 카테고리 신규 추가 / 삭제"):
                 c_col1, c_col2 = st.columns([2, 1])
@@ -329,7 +333,6 @@ else:
         with col2:
             st.subheader("등록된 마스터 상품 목록")
 
-            # [관리자 전용] 수정/삭제 조작
             if is_admin and st.session_state.master_products:
                 with st.expander("👑 [관리자 전용] 상품 삭제"):
                     prod_codes = [
@@ -438,7 +441,6 @@ else:
         with col2:
             st.subheader("발주 등록 내역 및 현황")
 
-            # [관리자 전용] 발주 상태 변경 / 삭제
             if is_admin and st.session_state.purchase_orders:
                 with st.expander("👑 [관리자 전용] 발주 상태 변경 및 삭제"):
                     po_nos = [
@@ -534,7 +536,6 @@ else:
         with col2:
             st.subheader("등록된 직원 목록")
 
-            # [관리자 전용] 계정 삭제
             if is_admin and len(st.session_state.users) > 1:
                 with st.expander("👑 [관리자 전용] 직원 계정 삭제"):
                     user_ids = [
@@ -591,7 +592,6 @@ else:
         with col2:
             st.subheader("휴가 신청 현황 및 결재")
 
-            # [관리자 전용] 휴가 승인 / 반려
             if is_admin and st.session_state.leave_records:
                 with st.expander("👑 [관리자 전용] 휴가 결재 처리"):
                     leave_indices = list(
