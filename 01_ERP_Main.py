@@ -2,22 +2,20 @@ import datetime
 import pytz
 import streamlit as st
 
-# ⚠️ [중요] 반드시 import 직후, Streamlit 명령어 중 가장 첫 번째로 와야 합니다.
+# ⚠️ [필수] Streamlit 명령어 중 무조건 가장 첫 번째로 실행되어야 합니다.
 st.set_page_config(
     page_title="사내 통합 관리 시스템 (ERP)",
     page_layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ----------------------------------------------------
-# 화면 폭 최대화 CSS
-# ----------------------------------------------------
+# 화면 가로폭 최대화 CSS 적용
 st.markdown("""
     <style>
         .main .block-container {
             max-width: 98% !important;
             padding-left: 1rem !important;
-            padding-right: 1rem !important;
+            padding-right: 1.5rem !important;
             padding-top: 1.5rem !important;
         }
         .stDataFrame, div[data-testid="stTable"] {
@@ -37,6 +35,16 @@ LANG_PACK = {
         "role_info": "권한",
         "logout": "🚪 로그아웃",
         "tokyo_time": "도쿄 기준 시간 (Asia/Tokyo)",
+        "login_req": "로그인이 필요합니다.",
+        "id_ph": "사원번호 또는 아이디",
+        "pw_ph": "비밀번호",
+        "login_btn": "로그인",
+        "login_fail": "아이디 또는 비밀번호가 올바르지 않습니다.",
+        "signup_tab": "회원가입",
+        "login_tab": "로그인",
+        "signup_btn": "가입 신청",
+        "signup_success": "회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인할 수 있습니다.",
+        "not_approved": "아직 관리자 승인이 완료되지 않은 계정입니다.",
     },
     "日本語": {
         "title": "🏢 社内統合管理システム",
@@ -45,6 +53,16 @@ LANG_PACK = {
         "role_info": "権限",
         "logout": "🚪 ログアウト",
         "tokyo_time": "東京基準時間 (Asia/Tokyo)",
+        "login_req": "ログインしてください。",
+        "id_ph": "社員番号またはID",
+        "pw_ph": "パスワード",
+        "login_btn": "ログイン",
+        "login_fail": "IDまたはパスワードが正しくありません。",
+        "signup_tab": "新規登録",
+        "login_tab": "ログイン",
+        "signup_btn": "登録申請",
+        "signup_success": "登録申請が完了しました。管理者の承認後にログインできます。",
+        "not_approved": "まだ管理者の承認が完了していないアカウントです。",
     },
     "English": {
         "title": "🏢 Integrated ERP System",
@@ -53,174 +71,147 @@ LANG_PACK = {
         "role_info": "Role",
         "logout": "🚪 Logout",
         "tokyo_time": "Tokyo Time (Asia/Tokyo)",
+        "login_req": "Please log in to continue.",
+        "id_ph": "Employee ID or Username",
+        "pw_ph": "Password",
+        "login_btn": "Login",
+        "login_fail": "Invalid ID or Password.",
+        "signup_tab": "Sign Up",
+        "login_tab": "Login",
+        "signup_btn": "Register",
+        "signup_success": "Registration requested. You can log in after admin approval.",
+        "not_approved": "Account pending admin approval.",
     },
 }
 
 # ----------------------------------------------------
-# 2. 공통 세션 상태(데이터베이스) 초기화
+# 2. 공통 세션 상태(데이터베이스 시뮬레이션) 초기화
 # ----------------------------------------------------
 if "lang" not in st.session_state:
     st.session_state.lang = "한국어"
-
-# (이후 기존 코드 유지)
-
-# ==========================================
-# 0. 레이아웃 설정 및 가로 폭 최대화 CSS
-# ==========================================
-st.set_page_config(
-    page_title="사내 통합 관리 시스템 (ERP)",
-    page_layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-st.markdown("""
-    <style>
-        /* 메인 컨테이너 폭 최대화 및 여백 축소 */
-        .main .block-container {
-            max-width: 98% !important;
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-            padding-top: 1.5rem !important;
-        }
-        /* 테이블/데이터프레임 영역 가로 확장 */
-        .stDataFrame, div[data-testid="stTable"] {
-            width: 100% !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# ==========================================
-# 1. 다국어 딕셔너리 설정
-# ==========================================
-LANG_PACK = {
-    "한국어": {
-        "title": "🏢 사내 통합 관리 시스템",
-        "lang_select": "🌐 언어 선택 / Language",
-        "user_info": "접속자",
-        "role_info": "권한",
-        "logout": "🚪 로그아웃",
-        "tokyo_time": "도쿄 기준 시간 (Asia/Tokyo)",
-    },
-    "日本語": {
-        "title": "🏢 社内統合管理システム",
-        "lang_select": "🌐 言語選択 / Language",
-        "user_info": "ログインユーザー",
-        "role_info": "権限",
-        "logout": "🚪 ログアウト",
-        "tokyo_time": "東京基準時間 (Asia/Tokyo)",
-    },
-    "English": {
-        "title": "🏢 Integrated ERP System",
-        "lang_select": "🌐 Select Language",
-        "user_info": "Logged in as",
-        "role_info": "Role",
-        "logout": "🚪 Logout",
-        "tokyo_time": "Tokyo Time (Asia/Tokyo)",
-    },
-}
-
-# ==========================================
-# 2. 공통 세션 상태(데이터베이스) 초기화
-# ==========================================
-if "lang" not in st.session_state:
-    st.session_state.lang = "한국어"
-
-L = LANG_PACK[st.session_state.lang]
 
 if "users" not in st.session_state:
     st.session_state.users = [
         {
             "id": "admin",
-            "pw": "admin123",
+            "pw": "admin1234",
             "name": "관리자",
-            "position": "팀장",
-            "dept": "경영관리팀",
-            "role": "관리자",
-            "status": "승인 완료",
-            "hire_date": "2024-01-01",
-            "annual_leave": 15.0,
-        }
+            "role": "CEO / 관리자",
+            "position": "대표이사",
+            "approved": True,
+            "hire_date": "2023-01-01",
+            "remaining_leave": 15,
+        },
+        {
+            "id": "user1",
+            "pw": "1234",
+            "name": "김사원",
+            "role": "일반 사용자",
+            "position": "사원",
+            "approved": True,
+            "hire_date": "2024-03-01",
+            "remaining_leave": 12,
+        },
     ]
 
-if "logged_in_user" not in st.session_state:
-    st.session_state.logged_in_user = None
-
-if "warehouses" not in st.session_state:
-    st.session_state.warehouses = ["SAGAWA", "L&K", "大吉商事"]
-
 if "positions" not in st.session_state:
-    st.session_state.positions = ["사원", "주임", "대리", "과장", "차장", "부장", "팀장", "이사", "법인장"]
+    st.session_state.positions = ["대표이사", "이사", "부장", "과장", "대리", "사원"]
 
 if "roles" not in st.session_state:
-    st.session_state.roles = ["관리자", "STAFF", "방문자"]
+    st.session_state.roles = ["CEO / 관리자", "일반 사용자"]
+
+if "warehouses" not in st.session_state:
+    st.session_state.warehouses = ["도쿄 본사 창고", "오사카 물류 센터", "치바 냉장 창고"]
 
 if "master_products" not in st.session_state:
     st.session_state.master_products = [
         {
-            "code": "PRD-1001",
-            "name": "샘플 마스크팩",
-            "jan_pack": "4901234567890",
-            "jan_single": "4901234567891",
-            "capacity": "10매/곽",
-            "category": "화장품/뷰티",
-            "price": 3000,
-            "in_pack_qty": "1곽/10장",
-            "prod_size": "15x20x3cm",
-            "box_size": "40x30x20cm",
-            "plt_qty": "50박스",
-            "vendor": "大吉商事",
-        }
+            "jan_code": "8801234567890",
+            "product_name": "프리미엄 수분 크림 50ml",
+            "category": "스킨케어",
+            "capacity": "50ml",
+            "units_per_box": 24,
+            "box_cbm": 0.025,
+            "box_weight_kg": 12.0,
+            "plt_qty": 40,
+            "supply_price_jpy": 1500,
+            "list_price_jpy": 3000,
+            "memo": "주력 상품",
+        },
+        {
+            "jan_code": "8801234567891",
+            "product_name": "비타민 C 세럼 30ml",
+            "category": "스킨케어",
+            "capacity": "30ml",
+            "units_per_box": 36,
+            "box_cbm": 0.020,
+            "box_weight_kg": 10.0,
+            "plt_qty": 48,
+            "supply_price_jpy": 2000,
+            "list_price_jpy": 4000,
+            "memo": "인기 급상승",
+        },
     ]
 
 if "warehouse_stocks" not in st.session_state:
-    st.session_state.warehouse_stocks = {
-        "PRD-1001_SAGAWA": 50,
-        "PRD-1001_L&K": 30,
-        "PRD-1001_大吉商事": 20,
-    }
+    st.session_state.warehouse_stocks = [
+        {
+            "warehouse": "도쿄 본사 창고",
+            "jan_code": "8801234567890",
+            "product_name": "프리미엄 수분 크림 50ml",
+            "stock_qty": 1200,
+        },
+        {
+            "warehouse": "도쿄 본사 창고",
+            "jan_code": "8801234567891",
+            "product_name": "비타민 C 세럼 30ml",
+            "category": "스킨케어",
+            "capacity": "30ml",
+            "units_per_box": 36,
+            "stock_qty": 800,
+        },
+        {
+            "warehouse": "오사카 물류 센터",
+            "jan_code": "8801234567890",
+            "product_name": "프리미엄 수분 크림 50ml",
+            "stock_qty": 500,
+        },
+    ]
 
 if "clients" not in st.session_state:
     st.session_state.clients = [
         {
-            "id": 1,
-            "name": "(주)도쿄유통",
-            "zipcode": "100-0001",
-            "address": "東京都千代田区1-1",
+            "client_name": "도쿄 코스메틱스",
+            "business_type": "도매",
+            "contact_person": "다나카 상",
             "phone": "03-1234-5678",
-        }
+            "email": "tanaka@tokyocos.jp",
+            "postal_code": "100-0001",
+            "address": "도쿄도시 치요다구 1-1",
+        },
+        {
+            "client_name": "오사카 뷰티샵",
+            "business_type": "소매",
+            "contact_person": "사토 상",
+            "phone": "06-9876-5432",
+            "email": "sato@osakabeauty.jp",
+            "postal_code": "530-0001",
+            "address": "오사카시 키타구 우메다 2-2",
+        },
     ]
 
 if "client_products" not in st.session_state:
     st.session_state.client_products = [
         {
-            "id": 1,
-            "client_name": "(주)도쿄유통",
-            "prod_name": "샘플 마스크팩",
-            "jan_pack": "4901234567890",
-            "jan_single": "4901234567891",
-            "supply_price": 4500,
+            "client_name": "도쿄 코스메틱스",
+            "jan_code": "8801234567890",
+            "product_name": "프리미엄 수분 크림 50ml",
+            "custom_supply_price": 1400,
         }
     ]
 
 if "stock_logs" not in st.session_state:
-    st.session_state.stock_logs = [
-        {
-            "po_no": "PO-20260812-01",
-            "date": "2026-08-12",
-            "type": "출고",
-            "wh": "SAGAWA",
-            "client": "(주)도쿄유통",
-            "prod_name": "샘플 마스크팩",
-            "jan": "4901234567890",
-            "qty": 10,
-            "unit_price": 4500,
-            "total_price": 45000,
-            "trade_type": "납품",
-            "manager": "관리자",
-            "zipcode": "100-0001",
-            "ship_to": "(주)도쿄유통 / 東京都千代田区1-1 / 03-1234-5678",
-        }
-    ]
+    st.session_state.stock_logs = []
 
 if "attendance_records" not in st.session_state:
     st.session_state.attendance_records = []
@@ -229,94 +220,116 @@ if "leave_records" not in st.session_state:
     st.session_state.leave_records = []
 
 if "company_holidays" not in st.session_state:
-    st.session_state.company_holidays = [
-        {"id": 1, "date": "2026-01-01", "title": "元日 (신정)", "type": "일본 공휴일"},
-        {"id": 2, "date": "2026-01-12", "title": "成人の日 (성인의 날)", "type": "일본 공휴일"},
-        {"id": 3, "date": "2026-02-11", "title": "建国記念の日 (건국기념일)", "type": "일본 공휴일"},
-        {"id": 4, "date": "2026-02-23", "title": "天皇誕生日 (천황탄생일)", "type": "일본 공휴일"},
-        {"id": 5, "date": "2026-05-03", "title": "憲法記念日 (헌법기념일)", "type": "일본 공휴일"},
-        {"id": 6, "date": "2026-08-11", "title": "山の日 (산의 날)", "type": "일본 공휴일"},
-        {"id": 7, "date": "2026-11-03", "title": "文化の日 (문화의 날)", "type": "일본 공휴일"},
-        {"id": 8, "date": "2026-11-23", "title": "勤労感謝の日 (근로감사의 날)", "type": "일본 공휴일"},
-    ]
+    st.session_state.company_holidays = []
 
-# ==========================================
-# 3. 사이드바 글로벌 옵션
-# ==========================================
-st.sidebar.selectbox("🌐 Language / 언어", ["한국어", "日本語", "English"], key="lang")
+if "logged_in_user" not in st.session_state:
+    st.session_state.logged_in_user = None
 
-def get_tokyo_time():
-    tokyo_tz = pytz.timezone("Asia/Tokyo")
-    return datetime.datetime.now(tokyo_tz)
+# ----------------------------------------------------
+# 3. 사이드바 - 언어 및 로그인 상태 제어
+# ----------------------------------------------------
+st.sidebar.title("🌍 시스템 설정")
+selected_lang = st.sidebar.selectbox(
+    "🌐 언어 선택 / Language",
+    ["한국어", "日本語", "English"],
+    index=["한국어", "日本語", "English"].index(st.session_state.get("lang", "한국어")),
+)
+st.session_state.lang = selected_lang
+t = LANG_PACK[selected_lang]
 
-tokyo_now = get_tokyo_time()
+st.sidebar.markdown("---")
 
-# ==========================================
-# 4. 로그인 화면 및 메인 인트로
-# ==========================================
-if st.session_state.logged_in_user is None:
-    st.title(L["title"])
-    tab_login, tab_register = st.tabs(["🔑 로그인 / Login", "📝 계정 신청 / Register"])
+# 로그인 안 된 상태
+if not st.session_state.logged_in_user:
+    st.sidebar.subheader("🔐 로그인 / 회원가입")
+    tab_l, tab_s = st.sidebar.tabs([t["login_tab"], t["signup_tab"]])
 
-    with tab_login:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            with st.form("login_form"):
-                input_id = st.text_input("ID")
-                input_pw = st.text_input("Password", type="password")
-                submit = st.form_submit_button("로그인", use_container_width=True)
-
-                if submit:
-                    user = next((u for u in st.session_state.users if u["id"] == input_id and u["pw"] == input_pw), None)
-                    if user:
-                        if user.get("status") == "승인 대기":
-                            st.warning("계정 승인 대기 중입니다.")
-                        else:
-                            st.session_state.logged_in_user = user
-                            st.success(f"{user['name']}님 환영합니다!")
-                            st.rerun()
+    with tab_l:
+        login_id = st.text_input(t["id_ph"], key="login_id_input")
+        login_pw = st.text_input(t["pw_ph"], type="password", key="login_pw_input")
+        if st.button(t["login_btn"], key="main_login_btn"):
+            found = False
+            for u in st.session_state.users:
+                if u["id"] == login_id and u["pw"] == login_pw:
+                    found = True
+                    if not u["approved"]:
+                        st.sidebar.error(t["not_approved"])
                     else:
-                        st.error("ID 또는 비밀번호가 잘못되었습니다.")
+                        st.session_state.logged_in_user = u
+                        st.sidebar.success(f"환영합니다, {u['name']}님!")
+                        st.rerun()
+                    break
+            if not found:
+                st.sidebar.error(t["login_fail"])
 
-    with tab_register:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            with st.form("register_form"):
-                st.subheader("신규 계정 신청")
-                reg_id = st.text_input("아이디 *")
-                reg_pw = st.text_input("비밀번호 *", type="password")
-                reg_name = st.text_input("이름 *")
-                reg_dept = st.text_input("부서 *", value="영업팀")
-                reg_position = st.selectbox("직급 *", st.session_state.positions)
-                reg_role = st.selectbox("신청 권한 *", st.session_state.roles)
+    with tab_s:
+        new_id = st.text_input("아이디 (ID)", key="su_id")
+        new_pw = st.text_input("비밀번호 (PW)", type="password", key="su_pw")
+        new_name = st.text_input("이름 (성명)", key="su_name")
+        new_pos = st.selectbox("직급", st.session_state.positions, key="su_pos")
+        if st.button(t["signup_btn"], key="main_signup_btn"):
+            if not new_id or not new_pw or not new_name:
+                st.sidebar.error("모든 항목을 입력해주세요.")
+            else:
+                exists = any(u["id"] == new_id for u in st.session_state.users)
+                if exists:
+                    st.sidebar.error("이미 존재하는 아이디입니다.")
+                else:
+                    st.session_state.users.append({
+                        "id": new_id,
+                        "pw": new_pw,
+                        "name": new_name,
+                        "role": "일반 사용자",
+                        "position": new_pos,
+                        "approved": False,
+                        "hire_date": str(datetime.date.today()),
+                        "remaining_leave": 15,
+                    })
+                    st.sidebar.success(t["signup_success"])
 
-                if st.form_submit_button("신청 제출", use_container_width=True):
-                    if not reg_id or not reg_pw or not reg_name:
-                        st.error("필수 항목을 모두 입력해주세요.")
-                    elif any(u["id"] == reg_id for u in st.session_state.users):
-                        st.error("이미 존재하는 아이디입니다.")
-                    else:
-                        st.session_state.users.append({
-                            "id": reg_id,
-                            "pw": reg_pw,
-                            "name": reg_name,
-                            "position": reg_position,
-                            "dept": reg_dept,
-                            "role": reg_role,
-                            "status": "승인 완료" if reg_role == "방문자" else "승인 대기",
-                            "hire_date": str(datetime.date.today()),
-                            "annual_leave": 15.0,
-                        })
-                        st.success("신청이 완료되었습니다.")
+    st.stop()  # 로그인 전에는 메인 화면 진입 차단
+
+# 로그인 된 상태 - 사이드바 정보 표시
+user = st.session_state.logged_in_user
+st.sidebar.markdown(f"👤 **{t['user_info']}**: {user['name']} ({user['position']})")
+st.sidebar.markdown(f"🔑 **{t['role_info']}**: {user['role']}")
+
+tokyo_tz = pytz.timezone("Asia/Tokyo")
+current_tokyo_time = datetime.datetime.now(tokyo_tz).strftime("%Y-%m-%d %H:%M:%S")
+st.sidebar.info(f"🕒 {t['tokyo_time']}\n\n**{current_tokyo_time}**")
+
+if st.sidebar.button(t["logout"], key="main_logout_btn"):
+    st.session_state.logged_in_user = None
+    st.rerun()
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📂 메뉴를 선택하세요")
+st.sidebar.info("왼쪽 상단의 화살표(> 버튼)를 눌러 멀티페이지 메뉴를 열어주세요.")
+
+# ----------------------------------------------------
+# 4. 메인 대시보드 홈 화면
+# ----------------------------------------------------
+st.title(t["title"])
+st.markdown("---")
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric(label="등록된 마스터 상품", value=f"{len(st.session_state.master_products)} 개")
+with col2:
+    total_stock_qty = sum(item["stock_qty"] for item in st.session_state.warehouse_stocks)
+    st.metric(label="총 재고 수량", value=f"{total_stock_qty:,} 개")
+with col3:
+    st.metric(label="등록된 거래처", value=f"{len(st.session_state.clients)} 개")
+with col4:
+    st.metric(label="총 입출고 이력", value=f"{len(st.session_state.stock_logs)} 건")
+
+st.success(f"👋 **{user['name']}**님, 반갑습니다! 좌측 사이드바의 멀티페이지 메뉴에서 필요한 업무 화면을 선택하여 이용해 주세요.")
+
+st.markdown("---")
+st.markdown("### 📊 창고별 재고 현황 요약")
+if st.session_state.warehouse_stocks:
+    import pandas as pd
+    df_stock = pd.DataFrame(st.session_state.warehouse_stocks)
+    st.dataframe(df_stock, use_container_width=True)
 else:
-    user = st.session_state.logged_in_user
-    st.sidebar.write(f"**{L['user_info']}:** {user['name']} ({user['position']})")
-    st.sidebar.write(f"**{L['role_info']}:** {user['role']} {'👑' if user['role']=='관리자' else ''}")
-
-    if st.sidebar.button(L["logout"], use_container_width=True):
-        st.session_state.logged_in_user = None
-        st.rerun()
-
-    st.title("🏢 ERP 메인 대시보드 홈")
-    st.info(f"🕒 **{L['tokyo_time']}:** {tokyo_now.strftime('%Y-%m-%d %H:%M:%S')} JST")
-    st.success(f"안녕하세요, **{user['name']}**님! 좌측 사이드바 메뉴를 선택하여 각 독립 기능으로 이동하세요.")
+    st.info("등록된 재고 데이터가 없습니다.")
