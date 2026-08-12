@@ -1,122 +1,82 @@
-import calendar
-import datetime
-import pytz
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="타임카드 & 캘린더", page_layout="wide")
-st.markdown("<style>.main .block-container { max-width: 98% !important; }</style>", unsafe_allow_html=True)
-
-if st.session_state.get("logged_in_user") is None:
-    st.warning("로그인이 필요합니다.")
+user = st.session_state.get("logged_in_user")
+if not user:
+    st.warning("로그인이 필요한 페이지입니다. 메인 페이지에서 먼저 로그인해 주세요.")
     st.stop()
 
-user = st.session_state.logged_in_user
-is_admin = user.get("role") == "관리자" or user["id"] == "admin"
-is_visitor = user.get("role") == "방문자"
+st.title("📅 휴가 신청 및 달력/공휴일 관리")
+st.markdown("---")
 
-def get_tokyo_time():
-    return datetime.datetime.now(pytz.timezone("Asia/Tokyo"))
+tab1, tab2, tab3 = st.tabs(
+    ["🏖️ 휴가 신청", "📋 휴가 승인 관리 (관리자)", "🎌 회사 휴무일/공휴일 설정"]
+)
 
-st.header("📆 타임카드 (일본 기준 캘린더 & 일정 관리)")
-tokyo_now = get_tokyo_time()
-
-c1, c2 = st.columns([1, 1])
-
-with c1:
-    st.subheader("📝 휴가 / 일정 신청")
+with tab1:
+    st.subheader("휴가(연차) 신청하기")
     with st.form("leave_request_form"):
-        l_type = st.selectbox("신청 유형", ["연차", "반차", "병가", "경조사", "출장"])
-        l_start = st.date_input("시작일")
-        l_end = st.date_input("종료일")
-        l_reason = st.text_area("사유")
+        leave_type = st.selectbox("휴가 종류", ["연차", "반차", "경조사", "병가"])
+        leave_date = st.date_input("휴가 예정일")
+        reason = st.text_area("사유")
+        submit_leave = st.form_submit_button("신청서 제출")
 
-        if st.form_submit_button("신청 제출", disabled=is_visitor):
+        if submit_leave:
             st.session_state.leave_records.append({
-                "applicant": user["name"],
-                "type": l_type,
-                "start_date": str(l_start),
-                "end_date": str(l_end),
-                "reason": l_reason,
-                "status": "승인 대기",
+                "user_id": user["id"],
+                "name": user["name"],
+                "type": leave_type,
+                "date": str(leave_date),
+                "reason": reason,
+                "status": "대기중",
             })
-            st.success("신청 완료!")
-            st.rerun()
+            st.success("휴가 신청이 완료되었습니다.")
 
-    st.subheader("📋 신청 및 결재 현황")
-    if is_admin and st.session_state.leave_records:
-        with st.expander("👑 [관리자] 휴가 승인/반려"):
-            idx_l = st.selectbox("항목 선택", range(len(st.session_state.leave_records)))
-            b_a, b_r = st.columns(2)
-            if b_a.button("✅ 승인"):
-                st.session_state.leave_records[idx_l]["status"] = "승인 완료"
-                st.success("승인 처리되었습니다.")
-                st.rerun()
-            if b_r.button("❌ 반려"):
-                st.session_state.leave_records[idx_l]["status"] = "반려"
-                st.error("반려 처리되었습니다.")
-                st.rerun()
+    st.markdown("---")
+    st.subheader("내 휴가 신청 이력")
+    my_leaves = [
+        l for l in st.session_state.leave_records if l["user_id"] == user["id"]
+    ]
+    if my_leaves:
+        st.dataframe(pd.DataFrame(my_leaves), use_container_width=True)
 
-    if st.session_state.leave_records:
-        st.dataframe(pd.DataFrame(st.session_state.leave_records), use_container_width=True)
-
-with c2:
-    st.subheader("🇯🇵 일본 기준 월별 캘린더 & 휴무일 관리")
-
-    if is_admin:
-        with st.expander("👑 [관리자] 일본 공휴일/회사 휴무일 등록·수정·삭제"):
-            tab_h1, tab_h2 = st.tabs(["➕ 휴무일 등록", "🛠️ 휴무일 수정/삭제"])
-
-            with tab_h1:
-                with st.form("add_holiday_form"):
-                    hd_date = st.date_input("날짜")
-                    hd_title = st.text_input("휴무일 명칭 (예: 夏休み)")
-                    hd_type = st.selectbox("구분", ["일본 공휴일", "회사 휴무", "전체 월차"])
-
-                    if st.form_submit_button("휴무일 추가"):
-                        new_h_id = len(st.session_state.company_holidays) + 1
-                        st.session_state.company_holidays.append({
-                            "id": new_h_id,
-                            "date": str(hd_date),
-                            "title": hd_title,
-                            "type": hd_type,
-                        })
-                        st.success("휴무일이 등록되었습니다.")
+with tab2:
+    st.subheader("휴가 신청 승인 / 반려")
+    if "관리자" not in user["role"]:
+        st.warning("관리자만 접근할 수 있습니다.")
+    else:
+        if not st.session_state.leave_records:
+            st.info("신청된 휴가 내역이 없습니다.")
+        else:
+            for idx, l in enumerate(st.session_state.leave_records):
+                col1, col2, col3 = st.columns([3, 1, 1])
+                with col1:
+                    st.write(
+                        f"**[{l['status']}]** {l['name']} ({l['date']}) - {l['type']} : {l['reason']}"
+                    )
+                with col2:
+                    if st.button("승인", key=f"app_{idx}"):
+                        l["status"] = "승인"
+                        st.rerun()
+                with col3:
+                    if st.button("반려", key=f"rej_{idx}"):
+                        l["status"] = "반려"
                         st.rerun()
 
-            with tab_h2:
-                if st.session_state.company_holidays:
-                    h_options = [f"[{h['date']}] {h['title']}" for h in st.session_state.company_holidays]
-                    sel_h_opt = st.selectbox("수정/삭제할 휴무일 선택", h_options)
-                    sel_h_idx = h_options.index(sel_h_opt)
-                    target_h = st.session_state.company_holidays[sel_h_idx]
+with tab3:
+    st.subheader("회사 휴무일 등록")
+    with st.form("holiday_form"):
+        h_date = st.date_input("휴무일 날짜")
+        h_name = st.text_input("휴무일 명칭 (예: 창립기념일)")
+        if st.form_submit_button("휴무일 추가"):
+            st.session_state.company_holidays.append(
+                {"date": str(h_date), "name": h_name}
+            )
+            st.success("휴무일이 등록되었습니다.")
 
-                    e_h_title = st.text_input("휴무명 수정", value=target_h["title"])
-                    e_h_type = st.selectbox("구분 수정", ["일본 공휴일", "회사 휴무", "전체 월차"], index=["일본 공휴일", "회사 휴무", "전체 월차"].index(target_h.get("type", "일본 공휴일")))
-
-                    hb1, hb2 = st.columns(2)
-                    if hb1.button("휴무일 저장"):
-                        target_h["title"] = e_h_title
-                        target_h["type"] = e_h_type
-                        st.success("수정 완료")
-                        st.rerun()
-
-                    if hb2.button("❌ 휴무일 삭제"):
-                        del st.session_state.company_holidays[sel_h_idx]
-                        st.success("삭제 완료")
-                        st.rerun()
-
-    cy_col, cm_col = st.columns(2)
-    sel_y = cy_col.number_input("연도", min_value=2020, max_value=2030, value=tokyo_now.year)
-    sel_m = cm_col.number_input("월", min_value=1, max_value=12, value=tokyo_now.month)
-
-    st.write(f"### 📅 {sel_y}年 {sel_m}月 Calendar")
-    cal = calendar.monthcalendar(int(sel_y), int(sel_m))
-    st.dataframe(pd.DataFrame(cal, columns=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]), use_container_width=True)
-
-    st.markdown("**📍 이 달의 일본 공휴일 및 회사 휴무:**")
-    m_prefix = f"{sel_y}-{int(sel_m):02d}"
-
-    for h in st.session_state.company_holidays:
-        if h["date"].startswith(m_prefix):
-            st.write(f"🔴 **[{h['date']}]** {h['title']} ({h['type']})")
+    st.write("📋 **등록된 휴무일 목록**")
+    if st.session_state.company_holidays:
+        st.dataframe(
+            pd.DataFrame(st.session_state.company_holidays),
+            use_container_width=True,
+        )
