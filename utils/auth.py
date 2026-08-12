@@ -51,7 +51,12 @@ def render_login_page():
                     
                     st.session_state["user"] = user
                     st.success(t("login_success"))
-                    st.rerun()
+                    
+                    # 💡 로그인 성공 시 출퇴근 페이지(08_HR_System.py)로 즉시 이동
+                    try:
+                        st.switch_page("pages/08_HR_System.py")
+                    except Exception:
+                        st.rerun()
                 else:
                     st.error("등록되지 않은 이메일이거나 비활성화된 계정입니다.")
             except Exception as e:
@@ -62,7 +67,10 @@ def logout():
     if st.session_state.get("user"):
         user_id = st.session_state["user"]["id"]
         # DB 토큰 삭제
-        supabase.table("employees").update({"session_token": None}).eq("id", user_id).execute()
+        try:
+            supabase.table("employees").update({"session_token": None}).eq("id", user_id).execute()
+        except Exception:
+            pass
     
     st.session_state["user"] = None
     if "session_token" in st.query_params:
