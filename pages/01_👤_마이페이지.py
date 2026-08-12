@@ -1,25 +1,41 @@
 import streamlit as st
 
-st.set_page_config(page_title="마이페이지", page_layout="wide")
-st.markdown("<style>.main .block-container { max-width: 98% !important; }</style>", unsafe_allow_html=True)
-
-if st.session_state.get("logged_in_user") is None:
-    st.warning("로그인이 필요합니다. 메인 페이지(01_ERP_Main.py)에서 로그인해 주세요.")
+user = st.session_state.get("logged_in_user")
+if not user:
+    st.warning("로그인이 필요한 페이지입니다. 메인 페이지에서 먼저 로그인해 주세요.")
     st.stop()
 
-user = st.session_state.logged_in_user
-st.header("👤 마이페이지")
+st.title("👤 마이페이지")
+st.markdown("---")
 
-c1, c2 = st.columns(2)
-with c1:
-    st.subheader("📌 계정 정보")
-    st.write(f"- **ID:** `{user['id']}`")
-    st.write(f"- **Password:** `{user['pw']}`")
-    st.write(f"- **Name:** {user['name']}")
-    st.write(f"- **Position:** {user['position']}")
-    st.write(f"- **Department:** {user['dept']}")
-    st.write(f"- **Role:** {user['role']}")
-with c2:
-    st.subheader("🌴 근태 및 휴가 정보")
-    st.write(f"- **입사일:** {user.get('hire_date', '미등록')}")
-    st.metric("잔여 휴가(연차) 일수", f"{user.get('annual_leave', 15.0):.1f} 일")
+col1, col2 = st.columns(2)
+with col1:
+    st.subheader("📋 기본 정보")
+    st.write(f"**아이디:** {user['id']}")
+    st.write(f"**이름:** {user['name']}")
+    st.write(f"**직급:** {user['position']}")
+    st.write(f"**시스템 권한:** {user['role']}")
+
+with col2:
+    st.subheader("🌴 근태 및 연차 정보")
+    st.write(f"**입사일:** {user.get('hire_date', '미등록')}")
+    st.write(f"**잔여 연차:** {user.get('remaining_leave', 0)} 일")
+
+st.markdown("---")
+st.subheader("🔑 비밀번호 변경")
+with st.form("change_pw_form"):
+    current_pw = st.text_input("현재 비밀번호", type="password")
+    new_pw = st.text_input("새 비밀번호", type="password")
+    new_pw_confirm = st.text_input("새 비밀번호 확인", type="password")
+    submit_pw = st.form_submit_button("비밀번호 변경")
+
+    if submit_pw:
+        if current_pw != user["pw"]:
+            st.error("현재 비밀번호가 일치하지 않습니다.")
+        elif new_pw != new_pw_confirm:
+            st.error("새 비밀번호 확인이 일치하지 않습니다.")
+        elif not new_pw:
+            st.error("새 비밀번호를 입력해 주세요.")
+        else:
+            user["pw"] = new_pw
+            st.success("비밀번호가 성공적으로 변경되었습니다.")
