@@ -12,7 +12,7 @@ I18N = {
         "nav_hr": "⏰ 근태 및 인사 관리",
         
         # 대시보드
-        "dashboard_title": "📊 매출 analytics & 대시보드",
+        "dashboard_title": "📊 매출 Analytics & 대시보드",
         "tab_monthly": "📅 월별 조회 (연도/월)",
         "tab_detail": "🔍 상세 기간 조회 (프셋 선택)",
         "select_year": "연도 선택",
@@ -141,8 +141,8 @@ def t(key):
     lang = get_lang()
     return I18N.get(lang, {}).get(key, I18N["KO"].get(key, key))
 
-def render_sidebar():
-    st.sidebar.title(t("title"))
+# 언어 선택 드롭다운 (구버전 호환용)
+def render_lang_selector():
     lang_options = {"한국어": "KO", "日本語": "JA", "English": "EN"}
     current_lang = get_lang()
     current_label = [k for k, v in lang_options.items() if v == current_lang][0]
@@ -156,9 +156,7 @@ def render_sidebar():
         st.session_state["lang"] = lang_options[selected]
         st.rerun()
 
-    st.sidebar.markdown("---")
-    st.sidebar.page_link("pages/01_Dashboard.py", label=t("nav_dashboard"))
-    st.sidebar.page_link("pages/02_Master.py", label=t("nav_master"))
-    st.sidebar.page_link("pages/03_Sales_Order.py", label=t("nav_order"))
-    st.sidebar.page_link("pages/04_Inventory.py", label=t("nav_inventory"))
-    st.sidebar.page_link("pages/08_HR_System.py", label=t("nav_hr"))
+# 언어 선택 + 카테고리 사이드바 통합 출력
+def render_sidebar():
+    st.sidebar.title(t("title"))
+    render_lang_selector()
