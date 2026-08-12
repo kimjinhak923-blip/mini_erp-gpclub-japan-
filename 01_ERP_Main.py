@@ -246,6 +246,8 @@ st.sidebar.markdown("---")
 
 # 로그인 안 된 상태
 if not st.session_state.logged_in_user:
+    st.title(t["title"])
+    st.warning("🔒 " + t["login_req"])
     st.sidebar.subheader("🔐 로그인 / 회원가입")
     tab_l, tab_s = st.sidebar.tabs([t["login_tab"], t["signup_tab"]])
 
@@ -292,49 +294,46 @@ if not st.session_state.logged_in_user:
                     })
                     st.sidebar.success(t["signup_success"])
 
-    st.stop()  # 로그인 전에는 메인 화면 진입 차단
-
-# 로그인 된 상태 - 사이드바 정보 표시
-user = st.session_state.logged_in_user
-st.sidebar.markdown(f"👤 **{t['user_info']}**: {user['name']} ({user['position']})")
-st.sidebar.markdown(f"🔑 **{t['role_info']}**: {user['role']}")
-
-tokyo_tz = pytz.timezone("Asia/Tokyo")
-current_tokyo_time = datetime.datetime.now(tokyo_tz).strftime("%Y-%m-%d %H:%M:%S")
-st.sidebar.info(f"🕒 {t['tokyo_time']}\n\n**{current_tokyo_time}**")
-
-if st.sidebar.button(t["logout"], key="main_logout_btn"):
-    st.session_state.logged_in_user = None
-    st.rerun()
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📂 메뉴 안내")
-st.sidebar.info("왼쪽 상단의 메뉴(> 버튼)에서 원하는 페이지로 이동하세요.")
-
-# ----------------------------------------------------
-# 4. 메인 대시보드 홈 화면
-# ----------------------------------------------------
-st.title(t["title"])
-st.markdown("---")
-
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.metric(label="등록된 마스터 상품", value=f"{len(st.session_state.master_products)} 개")
-with col2:
-    total_stock_qty = sum(item["stock_qty"] for item in st.session_state.warehouse_stocks)
-    st.metric(label="총 재고 수량", value=f"{total_stock_qty:,} 개")
-with col3:
-    st.metric(label="등록된 거래처", value=f"{len(st.session_state.clients)} 개")
-with col4:
-    st.metric(label="총 입출고 이력", value=f"{len(st.session_state.stock_logs)} 건")
-
-st.success(f"👋 **{user['name']}**님, 반갑습니다! 좌측 사이드바의 멀티페이지 메뉴에서 필요한 업무 화면을 선택하여 이용해 주세요.")
-
-st.markdown("---")
-st.markdown("### 📊 창고별 재고 현황 요약")
-if st.session_state.warehouse_stocks:
-    import pandas as pd
-    df_stock = pd.DataFrame(st.session_state.warehouse_stocks)
-    st.dataframe(df_stock, use_container_width=True)
+# 로그인 된 상태
 else:
-    st.info("등록된 재고 데이터가 없습니다.")
+    user = st.session_state.logged_in_user
+    st.sidebar.markdown(f"👤 **{t['user_info']}**: {user['name']} ({user['position']})")
+    st.sidebar.markdown(f"🔑 **{t['role_info']}**: {user['role']}")
+
+    tokyo_tz = pytz.timezone("Asia/Tokyo")
+    current_tokyo_time = datetime.datetime.now(tokyo_tz).strftime("%Y-%m-%d %H:%M:%S")
+    st.sidebar.info(f"🕒 {t['tokyo_time']}\n\n**{current_tokyo_time}**")
+
+    if st.sidebar.button(t["logout"], key="main_logout_btn"):
+        st.session_state.logged_in_user = None
+        st.rerun()
+
+    st.sidebar.markdown("---")
+
+    # ----------------------------------------------------
+    # 4. 메인 대시보드 홈 화면
+    # ----------------------------------------------------
+    st.title(t["title"])
+    st.markdown("---")
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric(label="등록된 마스터 상품", value=f"{len(st.session_state.master_products)} 개")
+    with col2:
+        total_stock_qty = sum(item["stock_qty"] for item in st.session_state.warehouse_stocks)
+        st.metric(label="총 재고 수량", value=f"{total_stock_qty:,} 개")
+    with col3:
+        st.metric(label="등록된 거래처", value=f"{len(st.session_state.clients)} 개")
+    with col4:
+        st.metric(label="총 입출고 이력", value=f"{len(st.session_state.stock_logs)} 건")
+
+    st.success(f"👋 **{user['name']}**님, 반갑습니다! 좌측 사이드바 상단의 페이지 메뉴에서 원하는 화면을 선택해 주세요.")
+
+    st.markdown("---")
+    st.markdown("### 📊 창고별 재고 현황 요약")
+    if st.session_state.warehouse_stocks:
+        import pandas as pd
+        df_stock = pd.DataFrame(st.session_state.warehouse_stocks)
+        st.dataframe(df_stock, use_container_width=True)
+    else:
+        st.info("등록된 재고 데이터가 없습니다.")
