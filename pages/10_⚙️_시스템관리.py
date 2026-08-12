@@ -1,68 +1,51 @@
-import datetime
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="시스템관리", page_layout="wide")
-st.markdown("<style>.main .block-container { max-width: 98% !important; }</style>", unsafe_allow_html=True)
-
-if st.session_state.get("logged_in_user") is None:
-    st.warning("로그인이 필요합니다.")
+user = st.session_state.get("logged_in_user")
+if not user:
+    st.warning("로그인이 필요한 페이지입니다. 메인 페이지에서 먼저 로그인해 주세요.")
     st.stop()
 
-user = st.session_state.logged_in_user
-is_admin = user.get("role") == "관리자" or user["id"] == "admin"
+st.title("⚙️ 시스템 및 사용자 관리")
+st.markdown("---")
 
-st.header("⚙️ 시스템 관리 (사용자 및 인사정보 관리)")
+if "관리자" not in user["role"]:
+    st.error("관리자(CEO)만 접근할 수 있는 메뉴입니다.")
+    st.stop()
 
-t_u1, t_u2 = st.tabs(["👥 전체 계정 수정/관리", "👔 직원 정보 관리"])
+tab1, tab2 = st.tabs(["👤 사용자 승인 및 권한 관리", "🏢 공통 코드 관리"])
 
-with t_u1:
-    if is_admin:
-        st.subheader("👑 계정 수정 및 승인 관리")
-        u_ids = [u["id"] for u in st.session_state.users]
-        sel_u = st.selectbox("수정할 계정 선택", u_ids)
-        t_user = next(u for u in st.session_state.users if u["id"] == sel_u)
+with tab1:
+    st.subheader("전체 사용자 목록")
+    if st.session_state.users:
+        df_users = pd.DataFrame(st.session_state.users)
+        edited_users = st.data_editor(
+            df_users, num_rows="dynamic", use_container_width=True
+        )
+        if st.button("💾 사용자 설정 저장"):
+            st.session_state.users = edited_users.to_dict("records")
+            st.success("사용자 정보가 변경되었습니다.")
+            st.rerun()
 
-        with st.form("edit_user_form"):
-            eu_name = st.text_input("이름", value=t_user["name"])
-            eu_pos = st.selectbox("직급", st.session_state.positions)
-            eu_dept = st.text_input("부서", value=t_user.get("dept", ""))
-            eu_role = st.selectbox("권한", st.session_state.roles)
-            eu_status = st.selectbox("상태", ["승인 완료", "승인 대기"])
-
-            if st.form_submit_button("계정 저장"):
-                t_user["name"] = eu_name
-                t_user["position"] = eu_pos
-                t_user["dept"] = eu_dept
-                t_user["role"] = eu_role
-                t_user["status"] = eu_status
-                st.success("수정 저장이 완료되었습니다.")
+with tab2:
+    st.subheader("창고 / 직급 목록 관리")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("📋 **현재 창고 목록**")
+        st.write(st.session_state.warehouses)
+        new_wh = st.text_input("새 창고 추가")
+        if st.button("창고 추가"):
+            if new_wh and new_wh not in st.session_state.warehouses:
+                st.session_state.warehouses.append(new_wh)
+                st.success("창고가 추가되었습니다.")
                 st.rerun()
 
-    st.markdown("---")
-    st.subheader("📋 등록 계정 현황")
-    st.dataframe(pd.DataFrame(st.session_state.users)[
-        ["id", "name", "position", "dept", "role", "status", "hire_date", "annual_leave"]
-    ], use_container_width=True)
-
-with t_u2:
-    st.subheader("👔 직원 인사 정보 관리 (입사일/잔여연차)")
-    if is_admin:
-        e_ids = [u["id"] for u in st.session_state.users]
-        s_e_id = st.selectbox("직원 선택", e_ids)
-        t_e = next(u for u in st.session_state.users if u["id"] == s_e_id)
-
-        with st.form("emp_mgmt_form"):
-            e_hire = st.date_input("입사일", value=datetime.datetime.strptime(t_e.get("hire_date", str(datetime.date.today())), "%Y-%m-%d").date())
-            e_leave = st.number_input("잔여 연차", min_value=0.0, max_value=50.0, value=float(t_e.get("annual_leave", 15.0)), step=0.5)
-
-            if st.form_submit_button("인사정보 저장"):
-                t_e["hire_date"] = str(e_hire)
-                t_e["annual_leave"] = e_leave
-                st.success("저장되었습니다.")
+    with col2:
+        st.write("📋 **현재 직급 목록**")
+        st.write(st.session_state.positions)
+        new_pos = st.text_input("새 직급 추가")
+        if st.button("직급 추가"):
+            if new_pos and new_pos not in st.session_state.positions:
+                st.session_state.positions.append(new_pos)
+                st.success("직급이 추가되었습니다.")
                 st.rerun()
-
-    st.markdown("---")
-    st.dataframe(pd.DataFrame(st.session_state.users)[
-        ["id", "name", "position", "dept", "hire_date", "annual_leave"]
-    ], use_container_width=True)
