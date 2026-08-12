@@ -1,7 +1,15 @@
 import streamlit as st
 import pandas as pd
 from utils.db_client import supabase
-from datetime import datetime, time
+from utils.auth import require_auth
+
+# Streamlit 설정은 최상단에 배치
+st.set_page_config(page_title="ERP System", page_icon="🏢", layout="wide")
+
+# 로그인 인증 수행 (미인증 시 여기서 화면이 멈추고 로그인 화면 표시)
+require_auth()
+
+# --- 이 아래부터 기존 페이지 기능 코드 작성 ---
 
 st.set_page_config(page_title="HR & Attendance", page_icon="⏰", layout="wide")
 st.title("⏰ HR & Attendance Management (인사 및 근태 관리)")
