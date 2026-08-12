@@ -1,7 +1,6 @@
 import streamlit as st
 from supabase import create_client, Client
 
-# st.secrets 참조 오류 방지 (st.secrets["SUPABASE_URL"] 형식 사용)
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
