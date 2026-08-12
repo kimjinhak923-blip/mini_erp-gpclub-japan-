@@ -2,7 +2,6 @@ import streamlit as st
 
 I18N = {
     "KO": {
-        # 공통 & 인증
         "title": "ERP 시스템",
         "login": "로그인",
         "logout": "로그아웃",
@@ -10,65 +9,41 @@ I18N = {
         "password": "비밀번호",
         "remember_me": "자동 로그인 유지",
         "login_btn": "로그인 하기",
-        "login_success": "성공적으로 로그인되었습니다.",
-        "login_error": "이메일 또는 비밀번호가 올바르지 않습니다.",
         "lang_select": "언어 선택 / Language",
-        "welcome": "환영합니다",
         
-        # 근태 및 인사 관리
-        "hr_title": "근태 및 인사 관리",
+        # 권한
+        "role_admin": "관리자 (전체 권한)",
+        "role_employee": "일반사원 (등록/수정)",
+        "role_visitor": "방문자 (조회 전용)",
+        
+        # 근태 및 휴가
+        "hr_title": "인사 / 근태 및 휴가 관리",
         "today_clock": "오늘의 출퇴근 체크",
-        "clock_in_time": "출근 시간",
-        "clock_out_time": "퇴근 시간",
-        "not_checked": "미체크",
+        "clock_in": "출근 시간",
+        "clock_out": "퇴근 시간",
         "clock_in_btn": "🚀 출근하기",
         "clock_out_btn": "🚪 퇴근하기",
-        "clock_in_success": "출근 처리되었습니다.",
-        "clock_out_success": "퇴근 처리되었습니다.",
-        "current_status": "현재 상태",
-        "not_clocked_in": "미출근",
-        "today_date": "오늘 날짜",
-        "my_calendar": "나의 월별 근태 캘린더",
-        "no_logs": "이번 달 근태 기록이 없습니다.",
+        "not_checked": "미체크",
+        "vacation_info": "나의 연차 현황",
+        "total_vacation": "부여 연차",
+        "used_vacation": "사용 연차",
+        "remain_vacation": "잔여 연차",
+        "apply_leave": "🌴 휴가 신청하기",
+        "leave_history": "휴가 신청 내역 및 승인 상태",
         
-        # 테이블 컬럼
-        "col_date": "날짜",
-        "col_clock_in": "출근시간",
-        "col_clock_out": "퇴근시간",
-        "col_status": "상태",
-        "col_emp_code": "사번",
-        "col_name": "이름",
-        "col_dept": "부서",
-        "col_position": "직급",
-        "col_email": "이메일",
-        "col_role": "권한",
-        "col_active": "활성화",
-        
-        # 관리자 메뉴
-        "admin_menu": "관리자 전용 인사 관리 메뉴",
-        "tab_all_attendance": "📊 전체 직원 근태 관리 (수정/삭제)",
-        "tab_create_account": "👤 직원 계정 생성 및 배포",
-        "select_log_edit": "수정/삭제할 기록 선택 (ID)",
-        "save_edit": "수정 저장",
-        "delete_btn": "삭제하기",
-        "edit_success": "근태 기록이 수정되었습니다.",
-        "delete_success": "기록이 삭제되었습니다.",
-        "create_emp_header": "➕ 신규 직원 등록 (로그인 계정 발급)",
-        "emp_code_placeholder": "사번 (예: EMP-0002)",
-        "emp_name_label": "직원 이름",
-        "dept_label": "부서명",
-        "pos_label": "직급",
-        "login_email_label": "로그인용 이메일",
-        "role_label": "권한 구분",
-        "create_emp_btn": "직원 계정 생성하기",
-        "required_fields_error": "사번, 이름, 이메일은 필수 입력 항목입니다.",
-        "account_created_success": "계정이 생성되었습니다! 로그인 이메일:",
-        "account_created_error": "계정 생성 실패:",
-        "all_emp_list": "📋 등록된 전체 직원 목록",
-        "admin_only_info": "🔒 관리자 권한(ADMIN)으로 로그인하시면 전체 직원 근태 관리 및 신규 계정 생성 메뉴가 활성화됩니다."
+        # 대시보드
+        "dashboard_title": "📊 ERP 메인 대시보드",
+        "monthly_summary": "월별 매출 개요",
+        "select_month": "조회 월 선택",
+        "total_sales": "총 매출액",
+        "offline_sales": "오프라인 (납품) 매출",
+        "online_sales": "온라인 (EC) 매출",
+        "sales_trend": "월별 매출 추이 그래프",
+        "detail_search": "🔍 매출 상세 조회 (기간별/일별)",
+        "period_select": "조회 기간 선택 (최대 1년)",
+        "daily_breakdown": "일별 매출 상세 내역 (납품일 기준)"
     },
     "JA": {
-        # 共通 & 認証
         "title": "ERP システム",
         "login": "ログイン",
         "logout": "ログアウト",
@@ -76,65 +51,38 @@ I18N = {
         "password": "パスワード",
         "remember_me": "自動ログインを維持する",
         "login_btn": "ログイン",
-        "login_success": "ログインに成功しました。",
-        "login_error": "メールアドレスまたはパスワードが正しくありません。",
         "lang_select": "言語選択 / Language",
-        "welcome": "ようこそ",
         
-        # 勤怠・人事管理
-        "hr_title": "勤怠・人事管理",
+        "role_admin": "管理者 (全権限)",
+        "role_employee": "一般社員 (登録/修正)",
+        "role_visitor": "訪問者 (照会のみ)",
+        
+        "hr_title": "人事 / 勤怠・休暇管理",
         "today_clock": "本日の出退社チェック",
-        "clock_in_time": "出勤時間",
-        "clock_out_time": "退勤時間",
-        "not_checked": "未チェック",
+        "clock_in": "出勤時間",
+        "clock_out": "退勤時間",
         "clock_in_btn": "🚀 出勤する",
         "clock_out_btn": "🚪 退勤する",
-        "clock_in_success": "出勤処理が完了しました。",
-        "clock_out_success": "退勤処理が完了しました。",
-        "current_status": "現在のステータス",
-        "not_clocked_in": "未出勤",
-        "today_date": "本日の日付",
-        "my_calendar": "マイ月間勤怠カレンダー",
-        "no_logs": "今月の勤怠記録がありません。",
+        "not_checked": "未チェック",
+        "vacation_info": "マイ有給休暇状況",
+        "total_vacation": "付与日数",
+        "used_vacation": "消化日数",
+        "remain_vacation": "残日数",
+        "apply_leave": "🌴 休暇申請",
+        "leave_history": "休暇申請履歴・承認状況",
         
-        # テーブルカラム
-        "col_date": "日付",
-        "col_clock_in": "出勤時間",
-        "col_clock_out": "退勤時間",
-        "col_status": "ステータス",
-        "col_emp_code": "社員番号",
-        "col_name": "氏名",
-        "col_dept": "部署",
-        "col_position": "役職",
-        "col_email": "メールアドレス",
-        "col_role": "権限",
-        "col_active": "有効",
-        
-        # 管理者メニュー
-        "admin_menu": "管理者専用人事メニュー",
-        "tab_all_attendance": "📊 全社員勤怠管理 (修正/削除)",
-        "tab_create_account": "👤 社員アカウント作成・発行",
-        "select_log_edit": "修正/削除する記録を選択 (ID)",
-        "save_edit": "変更を保存",
-        "delete_btn": "削除する",
-        "edit_success": "勤怠記録が修正されました。",
-        "delete_success": "記録が削除されました。",
-        "create_emp_header": "➕ 新規社員登録 (ログインアカウント発行)",
-        "emp_code_placeholder": "社員番号 (例: EMP-0002)",
-        "emp_name_label": "社員氏名",
-        "dept_label": "部署名",
-        "pos_label": "役職",
-        "login_email_label": "ログイン用メールアドレス",
-        "role_label": "権限区分",
-        "create_emp_btn": "アカウントを作成する",
-        "required_fields_error": "社員番号、氏名、メールアドレスは必須項目です。",
-        "account_created_success": "アカウントが作成されました！ ログイン用メールアドレス:",
-        "account_created_error": "アカウント作成失敗:",
-        "all_emp_list": "📋 登録済み全社員一覧",
-        "admin_only_info": "🔒 管理者権限(ADMIN)でログインすると全社員勤怠管理および新規アカウント作成メニューが有効化されます。"
+        "dashboard_title": "📊 ERP メインダッシュボード",
+        "monthly_summary": "月間売上概要",
+        "select_month": "照会月選択",
+        "total_sales": "総売上高",
+        "offline_sales": "オフライン (納品) 売上",
+        "online_sales": "オンライン (EC) 売上",
+        "sales_trend": "月間売上推移グラフ",
+        "detail_search": "🔍 売上詳細照会 (期間別/日別)",
+        "period_select": "照会期間選択 (最大1年)",
+        "daily_breakdown": "日別売上詳細 (納品日基準)"
     },
     "EN": {
-        # Common & Auth
         "title": "ERP System",
         "login": "Login",
         "logout": "Logout",
@@ -142,62 +90,36 @@ I18N = {
         "password": "Password",
         "remember_me": "Keep me logged in",
         "login_btn": "Log In",
-        "login_success": "Logged in successfully.",
-        "login_error": "Invalid email or password.",
         "lang_select": "Language",
-        "welcome": "Welcome",
         
-        # HR Management
-        "hr_title": "HR & Attendance Management",
-        "today_clock": "Today's Attendance Check",
-        "clock_in_time": "Clock-in Time",
-        "clock_out_time": "Clock-out Time",
-        "not_checked": "Not Checked",
+        "role_admin": "Admin (Full Access)",
+        "role_employee": "Employee (Create/Edit)",
+        "role_visitor": "Visitor (Read Only)",
+        
+        "hr_title": "HR / Attendance & Leave",
+        "today_clock": "Today's Attendance",
+        "clock_in": "Clock In",
+        "clock_out": "Clock Out",
         "clock_in_btn": "🚀 Clock In",
         "clock_out_btn": "🚪 Clock Out",
-        "clock_in_success": "Clock-in recorded.",
-        "clock_out_success": "Clock-out recorded.",
-        "current_status": "Current Status",
-        "not_clocked_in": "Not Clocked In",
-        "today_date": "Today's Date",
-        "my_calendar": "My Monthly Attendance Calendar",
-        "no_logs": "No attendance records found for this month.",
+        "not_checked": "Not Checked",
+        "vacation_info": "My Vacation Balance",
+        "total_vacation": "Total Allocated",
+        "used_vacation": "Used Days",
+        "remain_vacation": "Remaining Days",
+        "apply_leave": "🌴 Request Leave",
+        "leave_history": "Leave Request History",
         
-        # Table Columns
-        "col_date": "Date",
-        "col_clock_in": "Clock In",
-        "col_clock_out": "Clock Out",
-        "col_status": "Status",
-        "col_emp_code": "Emp Code",
-        "col_name": "Name",
-        "col_dept": "Department",
-        "col_position": "Position",
-        "col_email": "Email",
-        "col_role": "Role",
-        "col_active": "Active",
-        
-        # Admin Menu
-        "admin_menu": "Admin HR Management Menu",
-        "tab_all_attendance": "📊 All Attendance Logs (Edit/Delete)",
-        "tab_create_account": "👤 Create & Issue Employee Account",
-        "select_log_edit": "Select Log to Edit/Delete (ID)",
-        "save_edit": "Save Changes",
-        "delete_btn": "Delete",
-        "edit_success": "Attendance record updated successfully.",
-        "delete_success": "Record deleted successfully.",
-        "create_emp_header": "➕ Register New Employee (Issue Login Account)",
-        "emp_code_placeholder": "Emp Code (e.g. EMP-0002)",
-        "emp_name_label": "Employee Name",
-        "dept_label": "Department",
-        "pos_label": "Position",
-        "login_email_label": "Login Email",
-        "role_label": "Role Type",
-        "create_emp_btn": "Create Employee Account",
-        "required_fields_error": "Emp code, Name, and Email are required fields.",
-        "account_created_success": "Account created! Login email:",
-        "account_created_error": "Failed to create account:",
-        "all_emp_list": "📋 All Registered Employee List",
-        "admin_only_info": "🔒 Log in with ADMIN role to access all employee logs and account creation tools."
+        "dashboard_title": "📊 ERP Main Dashboard",
+        "monthly_summary": "Monthly Sales Summary",
+        "select_month": "Select Month",
+        "total_sales": "Total Sales",
+        "offline_sales": "Offline Sales",
+        "online_sales": "Online (EC) Sales",
+        "sales_trend": "Sales Trend Graph",
+        "detail_search": "🔍 Detailed Analytics (Period/Daily)",
+        "period_select": "Select Date Range (Max 1 Year)",
+        "daily_breakdown": "Daily Breakdown (By Delivery Date)"
     }
 }
 
@@ -213,7 +135,6 @@ def t(key):
 def render_lang_selector():
     lang_options = {"한국어": "KO", "日本語": "JA", "English": "EN"}
     current_lang = get_lang()
-    
     current_label = [k for k, v in lang_options.items() if v == current_lang][0]
     
     selected = st.sidebar.selectbox(
@@ -221,7 +142,6 @@ def render_lang_selector():
         options=list(lang_options.keys()),
         index=list(lang_options.keys()).index(current_label)
     )
-    
     if lang_options[selected] != current_lang:
         st.session_state["lang"] = lang_options[selected]
         st.rerun()
