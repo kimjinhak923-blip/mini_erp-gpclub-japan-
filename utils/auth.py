@@ -1,7 +1,11 @@
 import streamlit as st
-import secrets
 from utils.db_client import supabase
 from utils.i18n import t, render_lang_selector
+
+def require_auth():
+    if "user" not in st.session_state or not st.session_state["user"]:
+        st.warning("로그인이 필요한 페이지입니다.")
+        st.stop()
 
 def init_auth():
     """URL Query Parameter를 활용하여 브라우저 재접속 시에도 자동 로그인 상태 유지"""
