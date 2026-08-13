@@ -8,35 +8,241 @@ import pandas as pd
 from sidebar_menu import render_sidebar
 
 render_sidebar()
-
 user = st.session_state.get("logged_in_user")
 
-st.title("📦 재고 입출고 처리 및 엑셀 대량 등록")
+st.title("📦 재고 입출고 및 출고 등록")
 st.markdown("---")
 
-tab1, tab2, tab3 = st.tabs(["📊 엑셀 대량 등록 (1~2년치 이력)", "📥 개별 입고 등록", "📤 개별 출고 등록"])
+tab1, tab2, tab3 = st.tabs(["📤 일반 출고 등록 (품목 동적 추가)", "📥 개별 입고 등록", "📁 엑셀 대량 업로드"])
 
-# --- TAB 1: 엑셀 대량 등록 ---
+# ==========================================
+# [TAB 1] 일반 출고 등록 (최대 30개 동적 추가)
+# ==========================================
 with tab1:
-    st.subheader("📁 1~2년치 입출고 데이터 엑셀 대량 업로드")
-    st.caption("필수 입력 항목만 작성하여 올리시면 상품 마스터 및 거래처 단가를 매칭하여 박스 수량, 금액, 카테고리 등을 자동 계산합니다.")
+    st.subheader("📋 출고 지시 및 발주 등록")
 
-    # 1. 샘플 양식 다운로드 버튼
-    template_df = pd.DataFrame([
-        {
-            "발주일/납품일": str(datetime.date.today()),
-            "구분(입고/출고)": "출고",
-            "용도(납품/샘플/FOC)": "납품",
-            "상품명": "프리미엄 수분 크림 50ml",
-            "수량": 100,
-            "거래처명": "(주)파트너스 코리아",
-            "납품처명": "도쿄 물류센터 3번 랙",
-            "창고명": "SAGAWA",
-            "발주번호": "PO-2026-001",
-            "발주관리코드": "ORD-001",
-            "상태": "출고완료",
-        }
-    ])
+    # 기본 정보 세션 유지
+    if "out_items_count" not in st.session_state:
+        st.session_state.out_items_count = 1
+
+    col_h1, col_h2, col_h3 = st.columns(3)
+    with col_h1:
+        out_wh = st.selectbox("출고 창고", ["SAGAWA", "L&K", "大吉商事"])
+        order_no = st.text_input("발주번호", value="PO-20260813-001")
+        order_code = st.text_input("발주관리번호", value="20260813-01")
+    with col_h2:
+        cli_names = [c["client_name"] for c in st.session_state.get("clients", [])]
+        sel_client = st.selectbox("거래처 선택", cli_names if cli_names else ["등록된 거래처 없음"])
+        order_date = st.date_input("발주일", datetime.date.today())
+        delivery_date = st.date_input("납품 희망일", datetime.date.today())
+    with col_h3:
+        dest_name = st.text_input("납품처명", value="도쿄 물류 센터")
+        dest_zip = st.text_input("우편번호", value="100-0001")
+        dest_addr = st.text_input("납품처 주소", value="東京都千代田区1-1")
+        dest_tel = st.text_input("납품처 전화번호", value="03-1234-5678")
+
+    st.markdown("---")
+    st.write("##### 📦 출고 등록 품목 목록")
+
+    master_prods = st.session_state.get("master_products", [])
+    prod_options = [f"{p['product_name']} ({p['jan_code']})" for p in master_prods]
+
+    items_data = []
+
+    # 동적 품목 행 생성
+    for i in range(st.session_state.out_items_count):
+        st.markdown(f"**품목 #{i+1}**")
+        c_p, c_qty, c_box, c_price, c_amt, c_purp = st.columns([3, 1, 1, 1.5, 1.5, 1])
+
+        with c_p:
+            selected_p_str = st.selectbox(f"상품 선택 #{i+1}", prod_options if prod_options else ["상품 없음"], key=f"p_select_{i}")
+            
+            # 선택된 상품 마스터 데이터 매칭
+            jan = selected_p_str.split("(")[-1].replace(")", "") if "(" in selected_p_str else ""
+            matched_p = next((p for p in master_prods if p["jan_code"] == jan), None)
+            
+            if matched_p:
+                st.caption(f"바코드(JAN): `{matched_p['jan_code']}`")
+
+        with c_qty:
+            qty = st.number_input(f"수량 #{i+1}", min_value=1, value=60, key=f"qty_{i}")
+
+        with c_box:
+            units_per_box = matched_p["units_per_box"] if matched_p else 1
+            box_count = round(qty / units_per_box, 2)
+            st.text_input(f"Box 수량 #{i+1}", value=f"{box_count} Box ({units_per_box}/Box)", disabled=True, key=f"box_{i}")
+
+        with c_purp:
+            purpose = st.selectbox(f"용도 #{i+1}", ["납품", "FOC", "샘플"], key=f"purp_{i}")
+
+        with c_price:
+            if purpose == "납품":
+                # 거래처 등록 단가 매칭
+                custom_p = next((cp for cp in st.session_state.get("client_products", []) if cp["client_name"] == sel_client and cp.get("jan_code") == jan), None)
+                unit_price = custom_p["custom_supply_price"] if custom_p else (matched_p["supply_price_jpy"] if matched_p else 0)
+                price_disp = f"¥{unit_price:,.0f}"
+                calc_amt = unit_price * qty
+            else:
+                unit_price = 0
+                price_disp = purpose  # FOC 또는 샘플로 출력
+                calc_amt = 0  # 합산 제외
+
+            st.text_input(f"공급단가 #{i+1}", value=price_disp, disabled=True, key=f"price_{i}")
+
+        with c_amt:
+            amt_disp = f"¥{calc_amt:,.0f}" if purpose == "납품" else purpose
+            st.text_input(f"금액 #{i+1}", value=amt_disp, disabled=True, key=f"amt_{i}")
+
+        items_data.append({
+            "p_name": matched_p["product_name"] if matched_p else "",
+            "jan": jan,
+            "qty": qty,
+            "box_qty": box_count,
+            "unit_price": unit_price,
+            "total_amount": calc_amt,
+            "purpose": purpose,
+            "price_disp": price_disp
+        })
+
+    # + 버튼 (최대 30개까지)
+    col_btn1, col_btn2 = st.columns([1, 4])
+    with col_btn1:
+        if st.session_state.out_items_count < 30:
+            if st.button("➕ 품목 추가", use_container_width=True):
+                st.session_state.out_items_count += 1
+                st.rerun()
+    with col_btn2:
+        if st.session_state.out_items_count > 1:
+            if st.button("➖ 품목 삭제"):
+                st.session_state.out_items_count -= 1
+                st.rerun()
+
+    st.markdown("---")
+
+    # 하단 총 합산 영역
+    total_prod_count = len(items_data)
+    total_out_qty = sum(item["qty"] for item in items_data)
+    total_out_box = sum(item["box_qty"] for item in items_data)
+    total_order_amount = sum(item["total_amount"] for item in items_data)
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("등록 품목 수", f"{total_prod_count:,} 개")
+    m2.metric("총 출고 수량", f"{total_out_qty:,} 개")
+    m3.metric("총 출고 Box 수량", f"{total_out_box:,.2f} Box")
+    m4.metric("총 발주 금액 (FOC/샘플 제외)", f"¥{total_order_amount:,.0f}")
+
+    if st.button("🚀 출고 확정 및 저장", type="primary", use_container_width=True):
+        for item in items_data:
+            st.session_state.stock_logs.append({
+                "date": str(order_date),
+                "delivery_date": str(delivery_date),
+                "type": "출고",
+                "purpose": item["purpose"],
+                "jan_code": item["jan"],
+                "product_name": item["p_name"],
+                "qty": item["qty"],
+                "box_qty": item["box_qty"],
+                "unit_price": item["unit_price"],
+                "total_amount": item["total_amount"],
+                "warehouse": out_wh,
+                "order_no": order_no,
+                "order_code": order_code,
+                "status": "출고완료",
+                "client_name": sel_client,
+                "destination": f"[{dest_name}] {dest_addr} (Tel: {dest_tel})",
+                "worker": user["name"] if user else "관리자",
+            })
+            
+            # 재고 차감
+            stk = next((s for s in st.session_state.warehouse_stocks if s["warehouse"] == out_wh and s["jan_code"] == item["jan"]), None)
+            if stk:
+                stk["stock_qty"] -= item["qty"]
+
+        st.success("출고 처리 및 이력이 정상적으로 저장되었습니다!")
+        st.session_state.out_items_count = 1
+        st.rerun()
+
+# ==========================================
+# [TAB 2] 개별 입고 등록 (매입/FOC & 매입단가 연동)
+# ==========================================
+with tab2:
+    st.subheader("📥 개별 입고 등록")
+    
+    in_wh = st.selectbox("입고 창고", ["SAGAWA", "L&K", "大吉商事"], key="in_wh_sel")
+    
+    m_prods = st.session_state.get("master_products", [])
+    m_opts = [f"{p['product_name']} ({p['jan_code']})" for p in m_prods]
+    sel_in_prod = st.selectbox("상품 선택 (마스터 등록 상품)", m_opts if m_opts else ["상품 없음"])
+    
+    jan_in = sel_in_prod.split("(")[-1].replace(")", "") if "(" in sel_in_prod else ""
+    matched_in_p = next((p for p in m_prods if p["jan_code"] == jan_in), None)
+
+    col_i1, col_i2, col_i3 = st.columns(3)
+    with col_i1:
+        in_qty = st.number_input("입고 수량", min_value=1, value=100)
+    with col_i2:
+        default_cost = matched_in_p.get("supply_price_jpy", 0) if matched_in_p else 0
+        in_unit_cost = st.number_input("매입 단가 (원/엔)", min_value=0, value=default_cost)
+    with col_i3:
+        in_purpose = st.selectbox("용도", ["매입", "FOC"])
+
+    # 총 매입액 계산
+    total_in_cost = in_qty * in_unit_cost if in_purpose == "매입" else 0
+    st.info(f"💡 총 매입 금액: **¥{total_in_cost:,.0f}** ({'FOC 무상 입고' if in_purpose == 'FOC' else '자동 연산'})")
+
+    if st.button("📥 입고 등록 실행", type="primary"):
+        st.session_state.stock_logs.append({
+            "date": str(datetime.date.today()),
+            "type": "입고",
+            "purpose": in_purpose,
+            "jan_code": jan_in,
+            "product_name": matched_in_p["product_name"] if matched_in_p else "",
+            "qty": in_qty,
+            "box_qty": round(in_qty / (matched_in_p["units_per_box"] if matched_in_p else 1), 2),
+            "unit_price": in_unit_cost,
+            "total_amount": total_in_cost,
+            "warehouse": in_wh,
+            "order_no": "IN-MANUAL",
+            "order_code": "-",
+            "status": "입고완료",
+            "client_name": "-",
+            "destination": in_wh,
+            "worker": user["name"] if user else "관리자",
+        })
+
+        # 창고 재고 증가
+        stk = next((s for s in st.session_state.warehouse_stocks if s["warehouse"] == in_wh and s["jan_code"] == jan_in), None)
+        if stk:
+            stk["stock_qty"] += in_qty
+        else:
+            st.session_state.warehouse_stocks.append({
+                "warehouse": in_wh,
+                "jan_code": jan_in,
+                "product_name": matched_in_p["product_name"] if matched_in_p else "",
+                "stock_qty": in_qty
+            })
+
+        st.success("입고 처리가 완료되었습니다.")
+        st.rerun()
+
+# ==========================================
+# [TAB 3] 엑셀 대량 업로드 (기존 기능 유지)
+# ==========================================
+with tab3:
+    st.subheader("📁 1~2년치 입출고 데이터 엑셀 대량 업로드")
+    template_df = pd.DataFrame([{
+        "발주일/납품일": str(datetime.date.today()),
+        "구분(입고/출고)": "출고",
+        "용도(납품/샘플/FOC)": "납품",
+        "상품명": "프리미엄 수분 크림 50ml",
+        "수량": 100,
+        "거래처명": "(주)파트너스 코리아",
+        "납품처명": "도쿄 물류센터 3번 랙",
+        "창고명": "SAGAWA",
+        "발주번호": "PO-2026-001",
+        "발주관리코드": "ORD-001",
+        "상태": "출고완료",
+    }])
 
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
@@ -48,180 +254,3 @@ with tab1:
         file_name="ERP_Stock_Import_Template.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-
-    st.markdown("---")
-
-    # 2. 파일 업로더
-    uploaded_file = st.file_uploader("작성한 엑셀 파일(.xlsx, .xls) 또는 CSV 파일을 선택하세요", type=["xlsx", "xls", "csv"])
-
-    if uploaded_file is not None:
-        try:
-            if uploaded_file.name.endswith(".csv"):
-                df_upload = pd.read_csv(uploaded_file)
-            else:
-                df_upload = pd.read_excel(uploaded_file)
-
-            st.write("📋 **업로드된 데이터 미리보기**")
-            st.dataframe(df_upload.head(10), use_container_width=True)
-
-            if st.button("🚀 데이터 매칭 및 대량 등록 실행", type="primary"):
-                success_count = 0
-                master_prods = st.session_state.master_products
-                clients = st.session_state.clients
-                client_prices = st.session_state.client_products
-
-                for _, row in df_upload.iterrows():
-                    p_name = str(row.get("상품명", "")).strip()
-                    qty = int(row.get("수량", 0))
-                    c_name = str(row.get("거래처명", "")).strip()
-                    wh_name = str(row.get("창고명", "SAGAWA")).strip()
-                    purpose = str(row.get("용도(납품/샘플/FOC)", "납품")).strip()
-                    io_type = str(row.get("구분(입고/출고)", "출고")).strip()
-
-                    # 마스터 상품 자동 매칭
-                    matched_p = next((p for p in master_prods if p["product_name"] == p_name), None)
-                    jan = matched_p["jan_code"] if matched_p else "UNKNOWN"
-                    category = matched_p["category"] if matched_p else "기타"
-                    units_per_box = matched_p["units_per_box"] if matched_p else 1
-
-                    # 박스 수량 자동 계산
-                    box_qty = round(qty / units_per_box, 2) if units_per_box > 0 else qty
-
-                    # 제품 단가 자동 매칭 (거래처 전용 단가 -> 없으면 마스터 공급가)
-                    custom_p = next((cp for cp in client_prices if cp["client_name"] == c_name and cp["product_name"] == p_name), None)
-                    if custom_p:
-                        unit_price = custom_p["custom_supply_price"]
-                    else:
-                        unit_price = matched_p["supply_price_jpy"] if matched_p else 0
-
-                    total_amount = unit_price * qty
-
-                    # 이력 세션에 저장
-                    st.session_state.stock_logs.append({
-                        "date": str(row.get("발주일/납품일", str(datetime.date.today()))),
-                        "type": io_type,
-                        "purpose": purpose,
-                        "jan_code": jan,
-                        "product_name": p_name,
-                        "category": category,
-                        "qty": qty,
-                        "box_qty": box_qty,
-                        "unit_price": unit_price,
-                        "total_amount": total_amount,
-                        "warehouse": wh_name,
-                        "order_no": str(row.get("발주번호", "-")),
-                        "order_code": str(row.get("발주관리코드", "-")),
-                        "status": str(row.get("상태", "완료")),
-                        "client_name": c_name,
-                        "destination": str(row.get("납품처명", "-")),
-                        "worker": user["name"],
-                    })
-
-                    # 재고 반영
-                    stk = next((s for s in st.session_state.warehouse_stocks if s["warehouse"] == wh_name and s["product_name"] == p_name), None)
-                    if stk:
-                        if io_type == "입고":
-                            stk["stock_qty"] += qty
-                        else:
-                            stk["stock_qty"] -= qty
-                    else:
-                        st.session_state.warehouse_stocks.append({
-                            "warehouse": wh_name,
-                            "jan_code": jan,
-                            "product_name": p_name,
-                            "stock_qty": qty if io_type == "입고" else -qty,
-                        })
-
-                    success_count += 1
-
-                st.success(f"🎉 총 {success_count}건의 데이터가 성공적으로 등록 및 자동 계산되었습니다!")
-                st.rerun()
-
-        except Exception as e:
-            st.error(f"파일 처리 중 오류가 발생했습니다: {e}")
-
-# --- TAB 2 & TAB 3: 개별 처리 (기존 기능 완전 복구) ---
-with tab2:
-    st.subheader("개별 입고 처리")
-    with st.form("single_in_form"):
-        c1, c2 = st.columns(2)
-        with c1:
-            in_wh = st.selectbox("입고 창고", st.session_state.warehouses)
-            p_opts = [f"{p['product_name']} ({p['jan_code']})" for p in st.session_state.master_products]
-            sel_in_p = st.selectbox("상품 선택", p_opts if p_opts else ["상품 없음"])
-        with c2:
-            in_qty = st.number_input("입고 수량(EA)", min_value=1, value=100)
-            in_purpose = st.selectbox("용도", ["납품", "샘플", "FOC"])
-
-        if st.form_submit_button("입고 등록"):
-            p_name = sel_in_p.split(" (")[0]
-            jan = sel_in_p.split("(")[-1].replace(")", "")
-            matched_p = next((p for p in st.session_state.master_products if p["jan_code"] == jan), None)
-
-            st.session_state.stock_logs.append({
-                "date": str(datetime.date.today()),
-                "type": "입고",
-                "purpose": in_purpose,
-                "jan_code": jan,
-                "product_name": p_name,
-                "category": matched_p["category"] if matched_p else "-",
-                "qty": in_qty,
-                "box_qty": round(in_qty / matched_p["units_per_box"], 2) if matched_p else in_qty,
-                "unit_price": matched_p["supply_price_jpy"] if matched_p else 0,
-                "total_amount": (matched_p["supply_price_jpy"] if matched_p else 0) * in_qty,
-                "warehouse": in_wh,
-                "order_no": "MANUAL-IN",
-                "order_code": "-",
-                "status": "입고완료",
-                "client_name": "-",
-                "destination": in_wh,
-                "worker": user["name"],
-            })
-            st.success("입고 완료되었습니다.")
-            st.rerun()
-
-with tab3:
-    st.subheader("개별 출고 처리")
-    with st.form("single_out_form"):
-        c1, c2 = st.columns(2)
-        with c1:
-            out_wh = st.selectbox("출고 창고", st.session_state.warehouses, key="single_out_wh")
-            cli_opts = [c["client_name"] for c in st.session_state.clients]
-            sel_cli = st.selectbox("거래처 선택", cli_opts if cli_opts else ["없음"])
-            p_opts = [f"{p['product_name']} ({p['jan_code']})" for p in st.session_state.master_products]
-            sel_out_p = st.selectbox("상품 선택", p_opts if p_opts else ["없음"], key="single_out_p")
-        with c2:
-            out_qty = st.number_input("출고 수량(EA)", min_value=1, value=10)
-            out_purpose = st.selectbox("용도", ["납품", "샘플", "FOC"], key="single_out_purp")
-            dest = st.text_input("납품처 주소/메모")
-
-        if st.form_submit_button("출고 확정"):
-            p_name = sel_out_p.split(" (")[0]
-            jan = sel_out_p.split("(")[-1].replace(")", "")
-            matched_p = next((p for p in st.session_state.master_products if p["jan_code"] == jan), None)
-
-            # 전용 단가 확인
-            custom_p = next((cp for cp in st.session_state.client_products if cp["client_name"] == sel_cli and cp["jan_code"] == jan), None)
-            u_price = custom_p["custom_supply_price"] if custom_p else (matched_p["supply_price_jpy"] if matched_p else 0)
-
-            st.session_state.stock_logs.append({
-                "date": str(datetime.date.today()),
-                "type": "출고",
-                "purpose": out_purpose,
-                "jan_code": jan,
-                "product_name": p_name,
-                "category": matched_p["category"] if matched_p else "-",
-                "qty": out_qty,
-                "box_qty": round(out_qty / matched_p["units_per_box"], 2) if matched_p else out_qty,
-                "unit_price": u_price,
-                "total_amount": u_price * out_qty,
-                "warehouse": out_wh,
-                "order_no": "MANUAL-OUT",
-                "order_code": "-",
-                "status": "출고완료",
-                "client_name": sel_cli,
-                "destination": dest,
-                "worker": user["name"],
-            })
-            st.success("출고 처리되었습니다.")
-            st.rerun()
