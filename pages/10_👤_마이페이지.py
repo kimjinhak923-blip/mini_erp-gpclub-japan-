@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title="마이페이지", page_layout="wide")
+st.set_page_config(page_title="마이페이지", layout="wide")
 
 from sidebar_menu import render_sidebar
 
