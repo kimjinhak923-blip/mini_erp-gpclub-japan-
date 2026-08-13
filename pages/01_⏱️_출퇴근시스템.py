@@ -1,16 +1,15 @@
 import streamlit as st
 
-# ⚠️ [필수] Streamlit 명령어 중 무조건 최상단에 위치해야 에러가 안 납니다.
+# ⚠️ 무조건 코드 첫 번째 줄에 위치해야 에러가 발생하지 않습니다.
 st.set_page_config(page_title="출퇴근시스템", page_layout="wide")
 
 import datetime
 import pytz
 from sidebar_menu import render_sidebar
 
-# 공통 사이드바 호출 (ERP Main 텍스트 -> 메뉴 1~10 -> 번역 선택)
+# 공통 사이드바 출력
 render_sidebar()
 
-# --- 본문 영역 ---
 st.title("⏱️ 출퇴근 시스템")
 st.markdown("---")
 
