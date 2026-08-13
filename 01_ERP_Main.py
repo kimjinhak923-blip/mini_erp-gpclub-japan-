@@ -1,12 +1,13 @@
 import streamlit as st
 
+# ⚠️ [필수] import 다음 가장 첫 번째 Streamlit 명령어로 작성되어야 합니다.
 st.set_page_config(
     page_title="사내 통합 관리 시스템 (ERP)",
     page_layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# 기본 세션 초기화
+# --- 세션 데이터 초기화 ---
 if "lang" not in st.session_state:
     st.session_state.lang = "한국어"
 
@@ -33,7 +34,7 @@ if "users" not in st.session_state:
         },
     ]
 
-# 비로그인 상태 -> 중앙 메인 로그인 창
+# --- 로그인 / 회원가입 메인 화면 ---
 if not st.session_state.logged_in_user:
     st.title("🏢 사내 통합 관리 시스템")
     st.markdown("---")
@@ -75,5 +76,5 @@ if not st.session_state.logged_in_user:
                 else:
                     st.error("모든 항목을 입력해주세요.")
 else:
-    # 이미 로그인되어 있다면 출퇴근시스템으로 바로 이동
+    # 이미 로그인된 경우 1번 출퇴근시스템 페이지로 이동
     st.switch_page("pages/01_⏱️_출퇴근시스템.py")
