@@ -3,23 +3,23 @@ import pytz
 import streamlit as st
 
 def render_sidebar():
-    """안전한 공통 사이드바 (번역 + 로그인 세션 유지 + 지정된 순서)"""
+    """공통 사이드바: ERP Main 텍스트 -> 1~10 순서 메뉴 -> 번역 선택 -> 사용자 정보"""
 
-    # 1. 로그인 상태 체크 (미로그인 시 경고 후 메인 이동 안내)
+    # 미로그인 시 메인 페이지로 안전하게 이동 안내
     if not st.session_state.get("logged_in_user"):
-        st.warning("🔒 로그인이 필요합니다. 메인 화면으로 이동합니다.")
+        st.warning("🔒 로그인이 필요합니다.")
         if st.button("🔑 로그인 화면으로 이동", type="primary", use_container_width=True):
             st.switch_page("01_ERP_Main.py")
-        st.stop()  # 로그인 안 되었으면 아래 코드 실행 중단
+        st.stop()
 
     user = st.session_state.logged_in_user
 
-    # 2. 최상단: 클릭 불가능한 텍스트 표기
+    # 1. 최상단: 클릭 불가능한 텍스트 표기
     st.sidebar.markdown("### 🏢 **ERP Main**")
     st.sidebar.caption("사내 통합 관리 시스템")
     st.sidebar.markdown("---")
 
-    # 3. 요청하신 1~10번 메뉴 순서
+    # 2. 지정된 1~10번 메뉴 순서
     st.sidebar.subheader("📌 메뉴")
     st.sidebar.page_link("pages/01_⏱️_출퇴근시스템.py", label="1. 출퇴근시스템")
     st.sidebar.page_link("pages/02_📊_대시보드.py", label="2. 대시보드")
@@ -34,25 +34,22 @@ def render_sidebar():
 
     st.sidebar.markdown("---")
 
-    # 4. 메뉴 바로 아래: 번역(언어) 선택기 복구
+    # 3. 메뉴 바로 아래: 번역(언어) 선택기
     st.sidebar.subheader("🌐 번역 선택 / Language")
     current_lang = st.session_state.get("lang", "한국어")
-    
     selected_lang = st.sidebar.selectbox(
         "언어 선택",
         ["한국어", "日本語", "English"],
         index=["한국어", "日本語", "English"].index(current_lang) if current_lang in ["한국어", "日本語", "English"] else 0,
         label_visibility="collapsed"
     )
-    
-    # 언어 변경 시 세션 업데이트 및 리로드
-    if selected_lang != st.session_state.get("lang"):
+    if selected_lang != current_lang:
         st.session_state.lang = selected_lang
         st.rerun()
 
     st.sidebar.markdown("---")
 
-    # 5. 접속자 정보 & 도쿄 시간 & 로그아웃
+    # 4. 사용자 정보 & 도쿄 시간 & 로그아웃
     st.sidebar.markdown(f"👤 **접속자**: {user['name']} ({user.get('position', '사원')})")
     
     tokyo_tz = pytz.timezone("Asia/Tokyo")
