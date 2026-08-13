@@ -6,7 +6,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 세션 상태 초기화
+# 기본 세션 초기화
 if "lang" not in st.session_state:
     st.session_state.lang = "한국어"
 
@@ -33,7 +33,7 @@ if "users" not in st.session_state:
         },
     ]
 
-# 비로그인 상태: 중앙 메인 화면에 로그인 / 회원가입
+# 비로그인 상태 -> 중앙 메인 로그인 창
 if not st.session_state.logged_in_user:
     st.title("🏢 사내 통합 관리 시스템")
     st.markdown("---")
@@ -46,14 +46,13 @@ if not st.session_state.logged_in_user:
         with tab_l:
             login_id = st.text_input("사원번호 또는 아이디", key="main_login_id")
             login_pw = st.text_input("비밀번호", type="password", key="main_login_pw")
-            if st.button("로그인", use_container_width=True):
+            if st.button("로그인", use_container_width=True, type="primary"):
                 user = next((u for u in st.session_state.users if u["id"] == login_id and u["pw"] == login_pw), None)
                 if user:
                     if not user.get("approved", True):
                         st.error("아직 관리자 승인이 완료되지 않은 계정입니다.")
                     else:
                         st.session_state.logged_in_user = user
-                        # 로그인 성공 즉시 출퇴근 시스템 페이지로 스위치
                         st.switch_page("pages/01_⏱️_출퇴근시스템.py")
                 else:
                     st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
@@ -76,5 +75,5 @@ if not st.session_state.logged_in_user:
                 else:
                     st.error("모든 항목을 입력해주세요.")
 else:
-    # 이미 로그인된 상태에서 메인 접근 시 바로 출퇴근 페이지로 이동
+    # 이미 로그인되어 있다면 출퇴근시스템으로 바로 이동
     st.switch_page("pages/01_⏱️_출퇴근시스템.py")
