@@ -52,7 +52,9 @@ if "attendance_logs" not in st.session_state:
         {"user_name": "관리자", "date": "2026-08-03", "clock_in": "08:50", "clock_out": "18:30"},
         {"user_name": "관리자", "date": "2026-08-04", "clock_in": "09:05", "clock_out": "18:00"},
         {"user_name": "김사원", "date": "2026-08-03", "clock_in": "09:00", "clock_out": "18:00"},
+        {"user_name": "김사원", "date": "2026-08-05", "clock_in": "14:00", "clock_out": "15:30"},
         {"user_name": "이대리", "date": "2026-08-04", "clock_in": "08:45", "clock_out": "19:15"},
+        {"user_name": "이대리", "date": "2026-08-12", "clock_in": "09:00", "clock_out": "18:00"},
     ]
 
 # 회사 재량 휴무일 데이터
@@ -97,25 +99,34 @@ JAPAN_HOLIDAYS_2026 = {
 logged_user_name = user["name"] if user else "관리자"
 is_admin = (user.get("role") == "admin") if user else True
 
-# 등록된 직원 목록
+# 등록된 전체 직원 목록 가져오기
 all_users = st.session_state.get("users", [])
-user_list = [u["name"] for u in all_users] if all_users else ["관리자", "김사원", "이대리"]
+if all_users:
+    user_list = [u["name"] for u in all_users if isinstance(u, dict) and "name" in u]
+else:
+    user_list = ["관리자", "김사원", "이대리"]
+
 for u_name in ["관리자", "김사원", "이대리"]:
     if u_name not in user_list:
         user_list.append(u_name)
 
-# 관리자인 경우 상단 드롭다운 배치, 일반 직원은 본인 고정
+# 관리자인 경우 등록된 전체 직원을 선택하는 드롭다운 제공
 if is_admin:
     col_adm1, col_adm2 = st.columns([2, 3])
     with col_adm1:
-        selected_target_user = st.selectbox("👤 [관리자] 조회 및 관리 대상 직원 선택", user_list, index=0)
+        selected_target_user = st.selectbox(
+            "👤 [관리자] 조회 및 관리 대상 직원 선택", 
+            user_list, 
+            index=0,
+            key="target_user_select"
+        )
     with col_adm2:
-        st.info(f"🔑 관리자 권한 로그인: 현재 **[{selected_target_user}]** 님의 타임카드/휴가를 관리 중입니다.")
+        st.info(f"🔑 관리자 권한 로그인: 현재 **[{selected_target_user}]** 님의 개인 캘린더 및 타임카드를 관리/조회 중입니다.")
 else:
     selected_target_user = logged_user_name
-    st.caption(f"👤 **[{selected_target_user}]** 님의 타임카드 화면입니다.")
+    st.caption(f"👤 **[{selected_target_user}]** 님의 타임카드/개인 캘린더 화면입니다.")
 
-# 휴가 정보 보장
+# 연차 정보 보장
 if selected_target_user not in st.session_state.user_vacation_info:
     st.session_state.user_vacation_info[selected_target_user] = {"granted": 15.0, "used": 0.0}
 
@@ -204,7 +215,7 @@ st.markdown("---")
 # ==========================================
 col_btn1, col_btn2, col_btn3 = st.columns([1.2, 1.2, 1.2])
 
-# --- [스케줄 / 휴가 신청 (사원용/관리자용)] ---
+# --- [스케줄 / 휴가 신청] ---
 with col_btn1:
     with st.popover("📝 스케줄 / 휴가 신청", use_container_width=True):
         st.subheader("📝 스케줄 / 휴가 신청서")
@@ -236,7 +247,7 @@ with col_btn1:
                 st.success(f"[{selected_target_user}] 님의 스케줄/휴가 신청이 제출되었습니다.")
                 st.rerun()
 
-# --- [사내 공유 일정 등록 (일반직원/관리자 모두 가능)] ---
+# --- [사내 공유 일정 등록] ---
 with col_btn2:
     with st.popover("📌 사내 공유 일정 등록", use_container_width=True):
         st.subheader("📌 업무/미팅/회의실 일정 공유")
@@ -260,7 +271,7 @@ with col_btn2:
                 st.success("사내 공유 일정에 성공적으로 등록되었습니다.")
                 st.rerun()
 
-# --- [일별 데이터 생성 및 엑셀 다운로드] ---
+# --- [선택된 직원의 일별 데이터 생성 및 엑셀 다운로드] ---
 daily_rows = []
 tot_work, tot_ot, tot_tard, tot_early, tot_break, tot_sum = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
@@ -370,7 +381,7 @@ if is_admin:
 st.markdown("---")
 col_cal_hdr, col_cal_sel = st.columns([2, 1])
 with col_cal_hdr:
-    st.subheader("📅 캘린더 관리")
+    st.subheader(f"📅 [{selected_target_user}] 캘린더 관리")
 with col_cal_sel:
     cal_mode = st.selectbox("캘린더 종류 선택", ["👤 개인 캘린더 (출퇴근)", "🏢 사내 캘린더 (휴가/공휴일/일정)"])
 
@@ -433,7 +444,7 @@ for week in month_weeks:
                 card_html += f"<div style='font-weight:bold; font-size:14px; color:{day_color}; margin-bottom:3px;'>{month}/{day_num}</div>"
 
                 # ------------------------------------
-                # MODE 1: 개인 캘린더
+                # MODE 1: 개인 캘린더 (드롭다운에서 선택된 직원 전용)
                 # ------------------------------------
                 if cal_mode == "👤 개인 캘린더 (출퇴근)":
                     att = next((a for a in st.session_state.attendance_logs if a["date"] == date_str and a.get("user_name") == selected_target_user), None)
@@ -463,7 +474,7 @@ for week in month_weeks:
                         h_color = "#d90429" if comp_holiday["type"] == "공휴일표기" else "#4a5568"
                         card_html += f"<div style='font-size:11px; color:{h_color}; font-weight:bold; margin-top:2px;'>🏢 {comp_holiday['name']}</div>"
 
-                    # 3. 승인된 직원 휴가 (고대비 선명한 초록 뱃지)
+                    # 3. 승인된 직원 휴가
                     approved_vacs = [r for r in st.session_state.schedule_requests if r["date"] == date_str and r["status"] == "승인완료" and ("휴가" in r["type"] or "반차" in r["type"])]
                     for av in approved_vacs:
                         card_html += (
@@ -472,7 +483,7 @@ for week in month_weeks:
                             f"🌴 {av['user_name']}({av['type']})</div>"
                         )
 
-                    # 4. 사내 공유 일정 (고대비 선명한 파랑 뱃지)
+                    # 4. 사내 공유 일정
                     schedules = [s for s in st.session_state.company_schedules if s["date"] == date_str]
                     for sc in schedules:
                         card_html += (
@@ -502,22 +513,27 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 
 # ==========================================
-# 9. 일별 상세 타임카드 (관리자 셀 수정 가능 / 더블클릭)
+# 9. 일별 상세 타임카드 (셀 직접 수정 가능)
 # ==========================================
-st.subheader(f"📋 일별 상세 타임카드 ({month}월 1일 ~ {last_day}일)")
+st.subheader(f"📋 [{selected_target_user}] 님 일별 상세 타임카드 ({month}월 1일 ~ {last_day}일)")
 
 if is_admin:
-    st.info("💡 **[관리자 기능]** 아래 표에서 출근시간 / 퇴근시간 셀을 **더블클릭**하여 직접 수정하신 후, 하단의 **[💾 출퇴근 수정사항 저장]** 버튼을 누르면 즉시 반영 및 재계산됩니다.")
+    st.info("💡 **[관리자 기능]** 아래 표에서 출근시간 / 퇴근시간 셀을 **더블클릭**하여 직접 수정하신 후, 하단의 **[💾 출퇴근 수정사항 저장]** 버튼을 누르시면 세션 데이터에 즉시 반영 및 자동 재계산됩니다.")
     
+    # 수정할 데이터프레임 구조 정의
     edited_df = st.data_editor(
         df_daily_display[["날짜", "출근시간", "퇴근시간", "근무", "잔업", "지각", "조퇴", "휴식", "노동합계", "신청"]],
         disabled=["날짜", "근무", "잔업", "지각", "조퇴", "휴식", "노동합계", "신청"],
+        column_config={
+            "출근시간": st.column_config.TextColumn("출근시간 (HH:MM)", help="예: 09:00"),
+            "퇴근시간": st.column_config.TextColumn("퇴근시간 (HH:MM)", help="예: 18:00"),
+        },
         use_container_width=True,
         height=400,
-        key="admin_timecard_editor"
+        key=f"admin_timecard_editor_{selected_target_user}"
     )
 
-    if st.button("💾 출퇴근 수정사항 저장", type="primary"):
+    if st.button(f"💾 [{selected_target_user}] 출퇴근 수정사항 저장", type="primary"):
         for idx, row in edited_df.iterrows():
             raw_d = df_daily_display.loc[idx, "raw_date"]
             new_in = str(row["출근시간"]).strip()
@@ -537,7 +553,7 @@ if is_admin:
                         "clock_out": new_out
                     })
 
-        st.success("타임카드 출퇴근 수정사항이 성공적으로 저장되었습니다.")
+        st.success(f"[{selected_target_user}] 님의 타임카드 출퇴근 수정사항이 성공적으로 저장되었습니다.")
         st.rerun()
 
 else:
