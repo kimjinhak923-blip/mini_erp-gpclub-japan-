@@ -343,7 +343,6 @@ if is_admin:
                 c2.write(f"구분: `{pr['type']}` | 사유: {pr['reason']}")
                 if c3.button("✅ 승인", key=f"app_{pr['id']}"):
                     pr["status"] = "승인완료"
-                    # 연차 차감 로직
                     target_u = pr["user_name"]
                     if target_u not in st.session_state.user_vacation_info:
                         st.session_state.user_vacation_info[target_u] = {"granted": 15.0, "used": 0.0}
@@ -404,8 +403,8 @@ month_weeks = cal_obj.monthdayscalendar(year, month)
 cols_hdr = st.columns(7)
 day_headers = ["일", "월", "화", "수", "목", "금", "토"]
 for idx, dh in enumerate(day_headers):
-    color = "red" if idx == 0 else ("blue" if idx == 6 else "inherit")
-    cols_hdr[idx].markdown(f"<h4 style='text-align: center; color: {color}; margin-bottom:4px;'>{dh}</h4>", unsafe_allow_html=True)
+    color = "#e63946" if idx == 0 else ("#1d3557" if idx == 6 else "inherit")
+    cols_hdr[idx].markdown(f"<h4 style='text-align: center; color: {color}; margin-bottom:4px; font-weight:bold;'>{dh}</h4>", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -414,20 +413,24 @@ for week in month_weeks:
     for idx, day_num in enumerate(week):
         with cols_w[idx]:
             if day_num == 0:
-                st.markdown("<div style='background-color:#f8f9fa; height:120px; border-radius:4px; border:1px solid #eee;'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='background-color:rgba(200,200,200,0.1); height:125px; border-radius:6px; border:1px solid #444;'></div>", unsafe_allow_html=True)
             else:
                 date_str = f"{year}-{month:02d}-{day_num:02d}"
-                color = "red" if idx == 0 else ("blue" if idx == 6 else "#333")
+                
+                # 날짜 헤더 색상 (일요일: 빨강, 토요일: 파랑, 평일: 기본)
+                day_color = "#e63946" if idx == 0 else ("#2196f3" if idx == 6 else "#222222")
 
-                # 사내 캘린더 모드일 경우 공휴일 체크
                 jp_holiday = JAPAN_HOLIDAYS_2026.get(date_str)
                 comp_holiday = next((h for h in st.session_state.company_holidays if h["date"] == date_str), None)
                 
                 if jp_holiday or (comp_holiday and comp_holiday["type"] == "공휴일표기"):
-                    color = "red"
+                    day_color = "#e63946"
 
-                card_html = f"<div style='border:1px solid #ddd; border-radius:6px; padding:5px; height:120px; background-color:#fff; overflow-y:auto;'>"
-                card_html += f"<span style='font-weight:bold; font-size:13px; color:{color};'>{month}/{day_num}</span>"
+                card_html = (
+                    f"<div style='border:1px solid #ccc; border-radius:6px; padding:6px; height:125px; "
+                    f"background-color:#ffffff; color:#111111; overflow-y:auto; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'>"
+                )
+                card_html += f"<div style='font-weight:bold; font-size:14px; color:{day_color}; margin-bottom:3px;'>{month}/{day_num}</div>"
 
                 # ------------------------------------
                 # MODE 1: 개인 캘린더
@@ -437,10 +440,15 @@ for week in month_weeks:
                     req = next((r for r in st.session_state.schedule_requests if r["date"] == date_str and r["user_name"] == selected_target_user), None)
 
                     if att:
-                        card_html += f"<div style='font-size:11px; color:#28a745; margin-top:2px;'><b>출:</b> {att['clock_in']}<br><b>퇴:</b> {att['clock_out']}</div>"
+                        card_html += f"<div style='font-size:11px; color:#1b5e20; font-weight:600; margin-top:2px;'>⏰ <b>출:</b> {att['clock_in']} / <b>퇴:</b> {att['clock_out']}</div>"
                     if req:
                         bg_c = "#d4edda" if req["status"] == "승인완료" else "#fff3cd"
-                        card_html += f"<div style='font-size:10px; background-color:{bg_c}; padding:2px; border-radius:2px; margin-top:2px;'>[{req['type']}] {req['status']}</div>"
+                        text_c = "#155724" if req["status"] == "승인완료" else "#856404"
+                        card_html += (
+                            f"<div style='font-size:11px; font-weight:600; background-color:{bg_c}; color:{text_c}; "
+                            f"padding:2px 4px; border-radius:3px; margin-top:3px; border:1px solid {text_c};'>"
+                            f"[{req['type']}] {req['status']}</div>"
+                        )
 
                 # ------------------------------------
                 # MODE 2: 사내 캘린더
@@ -448,22 +456,30 @@ for week in month_weeks:
                 else:
                     # 1. 일본 공휴일
                     if jp_holiday:
-                        card_html += f"<div style='font-size:10px; color:red; font-weight:bold; margin-top:2px;'>🇯🇵 {jp_holiday}</div>"
+                        card_html += f"<div style='font-size:11px; color:#d90429; font-weight:bold; margin-top:2px;'>🇯🇵 {jp_holiday}</div>"
                     
                     # 2. 회사 재량 휴무일
                     if comp_holiday:
-                        h_color = "red" if comp_holiday["type"] == "공휴일표기" else "#6c757d"
-                        card_html += f"<div style='font-size:10px; color:{h_color}; font-weight:bold; margin-top:2px;'>🏢 {comp_holiday['name']}</div>"
+                        h_color = "#d90429" if comp_holiday["type"] == "공휴일표기" else "#4a5568"
+                        card_html += f"<div style='font-size:11px; color:{h_color}; font-weight:bold; margin-top:2px;'>🏢 {comp_holiday['name']}</div>"
 
-                    # 3. 승인된 직원 휴가
-                    approved_vacs = [r for r in st.session_state.schedule_requests if r["date"] == date_str and r["status"] == "승인완료" and "휴가" in r["type"] or "반차" in r["type"]]
+                    # 3. 승인된 직원 휴가 (고대비 선명한 초록 뱃지)
+                    approved_vacs = [r for r in st.session_state.schedule_requests if r["date"] == date_str and r["status"] == "승인완료" and ("휴가" in r["type"] or "반차" in r["type"])]
                     for av in approved_vacs:
-                        card_html += f"<div style='font-size:10px; background-color:#e2e3e5; padding:1px 3px; border-radius:2px; margin-top:2px;'>🌴 {av['user_name']}({av['type']})</div>"
+                        card_html += (
+                            f"<div style='font-size:11px; font-weight:bold; background-color:#d4edda; color:#155724; "
+                            f"padding:2px 4px; border-radius:3px; margin-top:2px; border:1px solid #c3e6cb;'>"
+                            f"🌴 {av['user_name']}({av['type']})</div>"
+                        )
 
-                    # 4. 사내 공유 일정
+                    # 4. 사내 공유 일정 (고대비 선명한 파랑 뱃지)
                     schedules = [s for s in st.session_state.company_schedules if s["date"] == date_str]
                     for sc in schedules:
-                        card_html += f"<div style='font-size:10px; background-color:#cce5ff; padding:1px 3px; border-radius:2px; margin-top:2px;'>📌 {sc['creator']}: {sc['title']} ({sc['time']})</div>"
+                        card_html += (
+                            f"<div style='font-size:11px; font-weight:bold; background-color:#e7f3ff; color:#004085; "
+                            f"padding:2px 4px; border-radius:3px; margin-top:2px; border:1px solid #b8daff;'>"
+                            f"📌 {sc['creator']}: {sc['title']} ({sc['time']})</div>"
+                        )
 
                 card_html += "</div>"
                 st.markdown(card_html, unsafe_allow_html=True)
@@ -493,7 +509,6 @@ st.subheader(f"📋 일별 상세 타임카드 ({month}월 1일 ~ {last_day}일)
 if is_admin:
     st.info("💡 **[관리자 기능]** 아래 표에서 출근시간 / 퇴근시간 셀을 **더블클릭**하여 직접 수정하신 후, 하단의 **[💾 출퇴근 수정사항 저장]** 버튼을 누르면 즉시 반영 및 재계산됩니다.")
     
-    # 관리자용 데이터 에디터 (출근시간, 퇴근시간 수정 가능)
     edited_df = st.data_editor(
         df_daily_display[["날짜", "출근시간", "퇴근시간", "근무", "잔업", "지각", "조퇴", "휴식", "노동합계", "신청"]],
         disabled=["날짜", "근무", "잔업", "지각", "조퇴", "휴식", "노동합계", "신청"],
@@ -503,7 +518,6 @@ if is_admin:
     )
 
     if st.button("💾 출퇴근 수정사항 저장", type="primary"):
-        # 변경사항 세션 저장 반영
         for idx, row in edited_df.iterrows():
             raw_d = df_daily_display.loc[idx, "raw_date"]
             new_in = str(row["출근시간"]).strip()
@@ -527,7 +541,6 @@ if is_admin:
         st.rerun()
 
 else:
-    # 일반 직원용 (읽기 전용)
     st.dataframe(
         df_daily_display[["날짜", "출근시간", "퇴근시간", "근무", "잔업", "지각", "조퇴", "휴식", "노동합계", "신청"]],
         use_container_width=True,
