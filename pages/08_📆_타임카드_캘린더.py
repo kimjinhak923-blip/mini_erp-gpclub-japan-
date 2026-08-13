@@ -1,12 +1,11 @@
-import streamlit as st
-
-st.set_page_config(page_title="타임카드 및 캘린더", layout="wide")
-
 import calendar
 import datetime
 import io
 import pandas as pd
+import streamlit as st
 from sidebar_menu import render_sidebar
+
+st.set_page_config(page_title="타임카드 및 캘린더", layout="wide")
 
 render_sidebar()
 user = st.session_state.get("logged_in_user")
@@ -22,7 +21,6 @@ if "tc_year" not in st.session_state:
 if "tc_month" not in st.session_state:
     st.session_state.tc_month = 8
 
-# 연차 현황 데이터 초기화 (기본 부여 15일)
 if "user_vacation_info" not in st.session_state:
     st.session_state.user_vacation_info = {
         "관리자": {"granted": 15.0, "used": 2.0},
@@ -30,7 +28,6 @@ if "user_vacation_info" not in st.session_state:
         "이대리": {"granted": 15.0, "used": 0.0},
     }
 
-# 스케줄 / 휴가 신청 데이터
 if "schedule_requests" not in st.session_state:
     st.session_state.schedule_requests = [
         {
@@ -46,7 +43,6 @@ if "schedule_requests" not in st.session_state:
         }
     ]
 
-# 출퇴근 기록 데이터
 if "attendance_logs" not in st.session_state:
     st.session_state.attendance_logs = [
         {"user_name": "관리자", "date": "2026-08-03", "clock_in": "08:50", "clock_out": "18:30"},
@@ -57,21 +53,18 @@ if "attendance_logs" not in st.session_state:
         {"user_name": "이대리", "date": "2026-08-12", "clock_in": "09:00", "clock_out": "18:00"},
     ]
 
-# 회사 재량 휴무일 데이터
 if "company_holidays" not in st.session_state:
     st.session_state.company_holidays = [
         {"date": "2026-08-14", "name": "회사 창립기념일 휴무", "type": "공휴일표기"},
         {"date": "2026-08-17", "name": "하계 특별 휴무", "type": "평일표기"},
     ]
 
-# 사내 공유 일정 (외부미팅, 회의실 사용 등)
 if "company_schedules" not in st.session_state:
     st.session_state.company_schedules = [
         {"id": 1, "creator": "김사원", "date": "2026-08-05", "time": "14:00~15:30", "title": "A상사 외부 미팅", "category": "외부미팅"},
         {"id": 2, "creator": "이대리", "date": "2026-08-12", "time": "10:00~11:00", "title": "대회의실 신제품 회의", "category": "회의실사용"},
     ]
 
-# 일본 공휴일 데이터 (2026년 기준)
 JAPAN_HOLIDAYS_2026 = {
     "2026-01-01": "신정 (元日)",
     "2026-01-12": "성인의 날 (成人の日)",
@@ -99,7 +92,6 @@ JAPAN_HOLIDAYS_2026 = {
 logged_user_name = user["name"] if user else "관리자"
 is_admin = (user.get("role") == "admin") if user else True
 
-# 등록된 전체 직원 목록 가져오기
 all_users = st.session_state.get("users", [])
 if all_users:
     user_list = [u["name"] for u in all_users if isinstance(u, dict) and "name" in u]
@@ -110,7 +102,6 @@ for u_name in ["관리자", "김사원", "이대리"]:
     if u_name not in user_list:
         user_list.append(u_name)
 
-# 관리자인 경우 등록된 전체 직원을 선택하는 드롭다운 제공
 if is_admin:
     col_adm1, col_adm2 = st.columns([2, 3])
     with col_adm1:
@@ -121,19 +112,17 @@ if is_admin:
             key="target_user_select"
         )
     with col_adm2:
-        st.info(f"🔑 관리자 권한 로그인: 현재 **[{selected_target_user}]** 님의 개인 캘린더 및 타임카드를 관리/조회 중입니다.")
+        st.info(f"🔑 관리자 권한 로그인: 현재 **[{selected_target_user}]** 님의 데이터 관리 중 (수정/삭제 권한 포함)")
 else:
     selected_target_user = logged_user_name
     st.caption(f"👤 **[{selected_target_user}]** 님의 타임카드/개인 캘린더 화면입니다.")
 
-# 연차 정보 보장
 if selected_target_user not in st.session_state.user_vacation_info:
     st.session_state.user_vacation_info[selected_target_user] = {"granted": 15.0, "used": 0.0}
 
 v_info = st.session_state.user_vacation_info[selected_target_user]
 rem_vacation = v_info["granted"] - v_info["used"]
 
-# 상단 연차 현황 요약
 st.markdown(
     f"💡 **[{selected_target_user}] 님의 연차 현황:** 부여 연차 `{v_info['granted']}일` | 사용 연차 `{v_info['used']}일` | **잔여 연차 `{rem_vacation}일`**"
 )
@@ -215,63 +204,147 @@ st.markdown("---")
 # ==========================================
 col_btn1, col_btn2, col_btn3 = st.columns([1.2, 1.2, 1.2])
 
-# --- [스케줄 / 휴가 신청] ---
 with col_btn1:
-    with st.popover("📝 스케줄 / 휴가 신청", use_container_width=True):
-        st.subheader("📝 스케줄 / 휴가 신청서")
-        with st.form("sched_form"):
-            req_date = st.date_input("신청 날짜", datetime.date(year, month, 1))
-            req_type = st.selectbox("신청 구분", ["연차/휴가", "반차", "출근시간 변경", "퇴근시간 변경", "휴일 근무"])
-            
-            c_t1, c_t2 = st.columns(2)
-            with c_t1:
-                req_start = st.time_input("희망 출근시간", datetime.time(9, 0))
-            with c_t2:
-                req_end = st.time_input("희망 퇴근시간", datetime.time(18, 0))
+    with st.popover("📝 스케줄 / 휴가 신청 및 관리", use_container_width=True):
+        st.subheader("📝 스케줄 / 휴가 신청")
+        
+        if is_admin:
+            tab_req_new, tab_req_edit = st.tabs(["➕ 신규 신청", "✏️ [관리자] 신청 내역 수정/삭제"])
+        else:
+            tab_req_new = st.container()
+
+        with tab_req_new:
+            with st.form("sched_form"):
+                req_date = st.date_input("신청 날짜", datetime.date(year, month, 1))
+                req_type = st.selectbox("신청 구분", ["연차/휴가", "반차", "출근시간 변경", "퇴근시간 변경", "휴일 근무"])
                 
-            req_reason = st.text_area("신청 사유", placeholder="사유를 입력해 주세요.")
+                c_t1, c_t2 = st.columns(2)
+                with c_t1:
+                    req_start = st.time_input("희망 출근시간", datetime.time(9, 0))
+                with c_t2:
+                    req_end = st.time_input("희망 퇴근시간", datetime.time(18, 0))
+                    
+                req_reason = st.text_area("신청 사유", placeholder="사유를 입력해 주세요.")
 
-            if st.form_submit_button("신청 제출"):
-                new_id = len(st.session_state.schedule_requests) + 1
-                st.session_state.schedule_requests.append({
-                    "id": new_id,
-                    "user_name": selected_target_user,
-                    "date": str(req_date),
-                    "type": req_type,
-                    "start_time": req_start.strftime("%H:%M") if "시간" in req_type else "-",
-                    "end_time": req_end.strftime("%H:%M") if "시간" in req_type else "-",
-                    "reason": req_reason,
-                    "status": "승인대기",
-                    "deducted": False,
-                })
-                st.success(f"[{selected_target_user}] 님의 스케줄/휴가 신청이 제출되었습니다.")
-                st.rerun()
+                if st.form_submit_button("신청 제출"):
+                    new_id = max([r["id"] for r in st.session_state.schedule_requests], default=0) + 1
+                    st.session_state.schedule_requests.append({
+                        "id": new_id,
+                        "user_name": selected_target_user,
+                        "date": str(req_date),
+                        "type": req_type,
+                        "start_time": req_start.strftime("%H:%M") if "시간" in req_type else "-",
+                        "end_time": req_end.strftime("%H:%M") if "시간" in req_type else "-",
+                        "reason": req_reason,
+                        "status": "승인대기",
+                        "deducted": False,
+                    })
+                    st.success(f"[{selected_target_user}] 님의 스케줄/휴가 신청이 제출되었습니다.")
+                    st.rerun()
 
-# --- [사내 공유 일정 등록] ---
+        if is_admin:
+            with tab_req_edit:
+                user_reqs = [r for r in st.session_state.schedule_requests if r["user_name"] == selected_target_user]
+                if not user_reqs:
+                    st.info(f"[{selected_target_user}] 님의 신청 내역이 없습니다.")
+                else:
+                    req_options = {f"[{r['date']}] {r['type']} ({r['status']})": r["id"] for r in user_reqs}
+                    selected_req_label = st.selectbox("수정/삭제할 신청 선택", list(req_options.keys()))
+                    target_req_id = req_options[selected_req_label]
+                    target_req = next(r for r in st.session_state.schedule_requests if r["id"] == target_req_id)
+
+                    with st.form("edit_req_form"):
+                        st.caption(f"신청자: {target_req['user_name']}")
+                        er_date = st.date_input("신청 날짜", datetime.datetime.strptime(target_req["date"], "%Y-%m-%d").date())
+                        er_type = st.selectbox("신청 구분", ["연차/휴가", "반차", "출근시간 변경", "퇴근시간 변경", "휴일 근무"], index=["연차/휴가", "반차", "출근시간 변경", "퇴근시간 변경", "휴일 근무"].index(target_req["type"]))
+                        
+                        c_et1, c_et2 = st.columns(2)
+                        with c_et1:
+                            er_start = st.text_input("출근 희망시간", value=target_req.get("start_time", "09:00"))
+                        with c_et2:
+                            er_end = st.text_input("퇴근 희망시간", value=target_req.get("end_time", "18:00"))
+
+                        er_reason = st.text_area("신청 사유", value=target_req.get("reason", ""))
+                        er_status = st.selectbox("승인 상태", ["승인대기", "승인완료", "반려"], index=["승인대기", "승인완료", "반려"].index(target_req["status"]))
+
+                        c_req_btn1, c_req_btn2 = st.columns(2)
+                        with c_req_btn1:
+                            if st.form_submit_button("💾 수정사항 저장"):
+                                target_req["date"] = str(er_date)
+                                target_req["type"] = er_type
+                                target_req["start_time"] = er_start
+                                target_req["end_time"] = er_end
+                                target_req["reason"] = er_reason
+                                target_req["status"] = er_status
+                                st.success("신청 내역이 수정되었습니다.")
+                                st.rerun()
+
+                        with c_req_btn2:
+                            if st.form_submit_button("🗑️ 신청 내역 삭제"):
+                                st.session_state.schedule_requests = [r for r in st.session_state.schedule_requests if r["id"] != target_req_id]
+                                st.success("신청 내역이 삭제되었습니다.")
+                                st.rerun()
+
+# --- 사내 공유 일정 등록 / 수정 / 삭제 ---
 with col_btn2:
-    with st.popover("📌 사내 공유 일정 등록", use_container_width=True):
+    with st.popover("📌 사내 공유 일정 관리", use_container_width=True):
         st.subheader("📌 업무/미팅/회의실 일정 공유")
-        st.caption("※ 일반 직원은 외부미팅, 회의실 사용 등 업무 공유 일정만 등록 가능합니다.")
-        with st.form("company_sched_form"):
-            cs_date = st.date_input("일정 날짜", datetime.date(year, month, 1))
-            cs_cat = st.selectbox("일정 카테고리", ["외부미팅", "회의실사용", "업무일정", "기타"])
-            cs_time = st.text_input("시간 (예: 14:00~15:30)", value="10:00~11:00")
-            cs_title = st.text_input("일정 내용/제목", placeholder="예: A상사 미팅 / 대회의실 사용")
+        
+        tab_add, tab_edit = st.tabs(["➕ 일정 신규 등록", "✏️ 등록 일정 수정/삭제"])
+        
+        with tab_add:
+            with st.form("company_sched_form"):
+                cs_date = st.date_input("일정 날짜", datetime.date(year, month, 1))
+                cs_cat = st.selectbox("일정 카테고리", ["외부미팅", "회의실사용", "업무일정", "기타"])
+                cs_time = st.text_input("시간 (예: 14:00~15:30)", value="10:00~11:00")
+                cs_title = st.text_input("일정 내용/제목", placeholder="예: A상사 미팅 / 대회의실 사용")
 
-            if st.form_submit_button("일정 공유 등록"):
-                cs_id = len(st.session_state.company_schedules) + 1
-                st.session_state.company_schedules.append({
-                    "id": cs_id,
-                    "creator": logged_user_name,
-                    "date": str(cs_date),
-                    "time": cs_time,
-                    "title": cs_title,
-                    "category": cs_cat
-                })
-                st.success("사내 공유 일정에 성공적으로 등록되었습니다.")
-                st.rerun()
+                if st.form_submit_button("일정 공유 등록"):
+                    cs_id = max([s["id"] for s in st.session_state.company_schedules], default=0) + 1
+                    st.session_state.company_schedules.append({
+                        "id": cs_id,
+                        "creator": logged_user_name,
+                        "date": str(cs_date),
+                        "time": cs_time,
+                        "title": cs_title,
+                        "category": cs_cat
+                    })
+                    st.success("사내 공유 일정에 성공적으로 등록되었습니다.")
+                    st.rerun()
+                    
+        with tab_edit:
+            if not st.session_state.company_schedules:
+                st.info("등록된 사내 공유 일정이 없습니다.")
+            else:
+                sched_options = {f"[{s['date']}] {s['creator']}: {s['title']}": s["id"] for s in st.session_state.company_schedules}
+                selected_sched_label = st.selectbox("수정/삭제할 일정 선택", list(sched_options.keys()))
+                target_sched_id = sched_options[selected_sched_label]
+                target_sched = next(s for s in st.session_state.company_schedules if s["id"] == target_sched_id)
 
-# --- [선택된 직원의 일별 데이터 생성 및 엑셀 다운로드] ---
+                if is_admin or target_sched["creator"] == logged_user_name:
+                    with st.form("edit_sched_form"):
+                        e_date = st.date_input("날짜", datetime.datetime.strptime(target_sched["date"], "%Y-%m-%d").date())
+                        e_cat = st.selectbox("카테고리", ["외부미팅", "회의실사용", "업무일정", "기타"], index=["외부미팅", "회의실사용", "업무일정", "기타"].index(target_sched.get("category", "기타")))
+                        e_time = st.text_input("시간", value=target_sched["time"])
+                        e_title = st.text_input("일정 제목", value=target_sched["title"])
+
+                        c_e1, c_e2 = st.columns(2)
+                        with c_e1:
+                            if st.form_submit_button("💾 수정 완료"):
+                                target_sched["date"] = str(e_date)
+                                target_sched["category"] = e_cat
+                                target_sched["time"] = e_time
+                                target_sched["title"] = e_title
+                                st.success("일정이 수정되었습니다.")
+                                st.rerun()
+                        with c_e2:
+                            if st.form_submit_button("🗑️ 일정 삭제"):
+                                st.session_state.company_schedules = [s for s in st.session_state.company_schedules if s["id"] != target_sched_id]
+                                st.success("일정이 삭제되었습니다.")
+                                st.rerun()
+                else:
+                    st.warning("⚠️ 해당 일정을 작성한 사용자 또는 관리자만 수정/삭제할 수 있습니다.")
+
 daily_rows = []
 tot_work, tot_ot, tot_tard, tot_early, tot_break, tot_sum = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
@@ -385,9 +458,8 @@ with col_cal_hdr:
 with col_cal_sel:
     cal_mode = st.selectbox("캘린더 종류 선택", ["👤 개인 캘린더 (출퇴근)", "🏢 사내 캘린더 (휴가/공휴일/일정)"])
 
-# 회사 재량 휴무일 추가/수정 (관리자 전용)
 if is_admin and cal_mode == "🏢 사내 캘린더 (휴가/공휴일/일정)":
-    with st.expander("🛠️ [관리자] 회사 재량 휴무일 추가 / 수정"):
+    with st.expander("🛠️ [관리자] 회사 재량 휴무일 추가 / 수정 / 삭제"):
         c_h1, c_h2, c_h3, c_h4 = st.columns([2, 2, 2, 1])
         with c_h1:
             ch_date = st.date_input("휴무일 날짜", datetime.date(year, month, 1))
@@ -407,7 +479,6 @@ if is_admin and cal_mode == "🏢 사내 캘린더 (휴가/공휴일/일정)":
                 st.success("재량 휴무일이 추가되었습니다.")
                 st.rerun()
 
-# 캘린더 그리기
 cal_obj = calendar.Calendar(firstweekday=6)
 month_weeks = cal_obj.monthdayscalendar(year, month)
 
@@ -427,8 +498,6 @@ for week in month_weeks:
                 st.markdown("<div style='background-color:rgba(200,200,200,0.1); height:125px; border-radius:6px; border:1px solid #444;'></div>", unsafe_allow_html=True)
             else:
                 date_str = f"{year}-{month:02d}-{day_num:02d}"
-                
-                # 날짜 헤더 색상 (일요일: 빨강, 토요일: 파랑, 평일: 기본)
                 day_color = "#e63946" if idx == 0 else ("#2196f3" if idx == 6 else "#222222")
 
                 jp_holiday = JAPAN_HOLIDAYS_2026.get(date_str)
@@ -443,9 +512,6 @@ for week in month_weeks:
                 )
                 card_html += f"<div style='font-weight:bold; font-size:14px; color:{day_color}; margin-bottom:3px;'>{month}/{day_num}</div>"
 
-                # ------------------------------------
-                # MODE 1: 개인 캘린더 (드롭다운에서 선택된 직원 전용)
-                # ------------------------------------
                 if cal_mode == "👤 개인 캘린더 (출퇴근)":
                     att = next((a for a in st.session_state.attendance_logs if a["date"] == date_str and a.get("user_name") == selected_target_user), None)
                     req = next((r for r in st.session_state.schedule_requests if r["date"] == date_str and r["user_name"] == selected_target_user), None)
@@ -461,20 +527,14 @@ for week in month_weeks:
                             f"[{req['type']}] {req['status']}</div>"
                         )
 
-                # ------------------------------------
-                # MODE 2: 사내 캘린더
-                # ------------------------------------
                 else:
-                    # 1. 일본 공휴일
                     if jp_holiday:
                         card_html += f"<div style='font-size:11px; color:#d90429; font-weight:bold; margin-top:2px;'>🇯🇵 {jp_holiday}</div>"
                     
-                    # 2. 회사 재량 휴무일
                     if comp_holiday:
                         h_color = "#d90429" if comp_holiday["type"] == "공휴일표기" else "#4a5568"
                         card_html += f"<div style='font-size:11px; color:{h_color}; font-weight:bold; margin-top:2px;'>🏢 {comp_holiday['name']}</div>"
 
-                    # 3. 승인된 직원 휴가
                     approved_vacs = [r for r in st.session_state.schedule_requests if r["date"] == date_str and r["status"] == "승인완료" and ("휴가" in r["type"] or "반차" in r["type"])]
                     for av in approved_vacs:
                         card_html += (
@@ -483,7 +543,6 @@ for week in month_weeks:
                             f"🌴 {av['user_name']}({av['type']})</div>"
                         )
 
-                    # 4. 사내 공유 일정
                     schedules = [s for s in st.session_state.company_schedules if s["date"] == date_str]
                     for sc in schedules:
                         card_html += (
@@ -513,14 +572,13 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 
 # ==========================================
-# 9. 일별 상세 타임카드 (셀 직접 수정 가능)
+# 9. 일별 상세 타임카드 (셀 직접 수정 및 기록 삭제 기능)
 # ==========================================
 st.subheader(f"📋 [{selected_target_user}] 님 일별 상세 타임카드 ({month}월 1일 ~ {last_day}일)")
 
 if is_admin:
-    st.info("💡 **[관리자 기능]** 아래 표에서 출근시간 / 퇴근시간 셀을 **더블클릭**하여 직접 수정하신 후, 하단의 **[💾 출퇴근 수정사항 저장]** 버튼을 누르시면 세션 데이터에 즉시 반영 및 자동 재계산됩니다.")
+    st.info("💡 **[관리자 기능]** 아래 셀을 수정 후 **[💾 수정사항 저장]**을 누르시거나, 필요 시 **특정 날짜의 기록 삭제**를 진행하실 수 있습니다.")
     
-    # 수정할 데이터프레임 구조 정의
     edited_df = st.data_editor(
         df_daily_display[["날짜", "출근시간", "퇴근시간", "근무", "잔업", "지각", "조퇴", "휴식", "노동합계", "신청"]],
         disabled=["날짜", "근무", "잔업", "지각", "조퇴", "휴식", "노동합계", "신청"],
@@ -529,32 +587,47 @@ if is_admin:
             "퇴근시간": st.column_config.TextColumn("퇴근시간 (HH:MM)", help="예: 18:00"),
         },
         use_container_width=True,
-        height=400,
+        height=380,
         key=f"admin_timecard_editor_{selected_target_user}"
     )
 
-    if st.button(f"💾 [{selected_target_user}] 출퇴근 수정사항 저장", type="primary"):
-        for idx, row in edited_df.iterrows():
-            raw_d = df_daily_display.loc[idx, "raw_date"]
-            new_in = str(row["출근시간"]).strip()
-            new_out = str(row["퇴근시간"]).strip()
+    col_save, col_del = st.columns([2, 3])
+    with col_save:
+        if st.button(f"💾 [{selected_target_user}] 출퇴근 수정사항 저장", type="primary", use_container_width=True):
+            for idx, row in edited_df.iterrows():
+                raw_d = df_daily_display.loc[idx, "raw_date"]
+                new_in = str(row["출근시간"]).strip()
+                new_out = str(row["퇴근시간"]).strip()
 
-            att = next((a for a in st.session_state.attendance_logs if a["date"] == raw_d and a.get("user_name") == selected_target_user), None)
-            
-            if att:
-                att["clock_in"] = new_in
-                att["clock_out"] = new_out
-            else:
-                if new_in != "-" or new_out != "-":
-                    st.session_state.attendance_logs.append({
-                        "user_name": selected_target_user,
-                        "date": raw_d,
-                        "clock_in": new_in,
-                        "clock_out": new_out
-                    })
+                att = next((a for a in st.session_state.attendance_logs if a["date"] == raw_d and a.get("user_name") == selected_target_user), None)
+                
+                if att:
+                    att["clock_in"] = new_in
+                    att["clock_out"] = new_out
+                else:
+                    if new_in != "-" or new_out != "-":
+                        st.session_state.attendance_logs.append({
+                            "user_name": selected_target_user,
+                            "date": raw_d,
+                            "clock_in": new_in,
+                            "clock_out": new_out
+                        })
 
-        st.success(f"[{selected_target_user}] 님의 타임카드 출퇴근 수정사항이 성공적으로 저장되었습니다.")
-        st.rerun()
+            st.success(f"[{selected_target_user}] 님의 타임카드 출퇴근 수정사항이 성공적으로 저장되었습니다.")
+            st.rerun()
+
+    with col_del:
+        with st.popover("🗑️ 출퇴근 기록 삭제", use_container_width=True):
+            st.write(f"**[{selected_target_user}] 님의 특정 날짜 출퇴근 기록 삭제**")
+            del_target_date = st.date_input("삭제할 날짜 선택", datetime.date(year, month, 1))
+            if st.button("❌ 선택한 날짜 출퇴근 기록 삭제 Execution", type="primary"):
+                del_str = str(del_target_date)
+                st.session_state.attendance_logs = [
+                    a for a in st.session_state.attendance_logs 
+                    if not (a["date"] == del_str and a.get("user_name") == selected_target_user)
+                ]
+                st.success(f"[{selected_target_user}] 님의 {del_str} 출퇴근 기록이 삭제되었습니다.")
+                st.rerun()
 
 else:
     st.dataframe(
