@@ -1,12 +1,13 @@
 import streamlit as st
 
+# ⚠️ page_layout -> layout 으로 파라미터명 수정 완료
 st.set_page_config(
     page_title="사내 통합 관리 시스템 (ERP)",
-    page_layout="wide",
+    layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# --- 기본 세션 데이터 초기화 (기존 기능 100% 보존 + 신규 기능 세션) ---
+# --- 기본 세션 데이터 초기화 (기능 100% 보존) ---
 if "lang" not in st.session_state:
     st.session_state.lang = "한국어"
 
@@ -60,7 +61,6 @@ if "master_products" not in st.session_state:
         }
     ]
 
-# 신규: 집기 마스터 세션
 if "master_fixtures" not in st.session_state:
     st.session_state.master_fixtures = [
         {
