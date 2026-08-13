@@ -1,14 +1,18 @@
-import pandas as pd
 import streamlit as st
+
+st.set_page_config(page_title="시스템관리", page_layout="wide")
+
+import pandas as pd
+from sidebar_menu import render_sidebar
+
+render_sidebar()
 
 user = st.session_state.get("logged_in_user")
 
 st.title("⚙️ 시스템 및 사용자 관리")
 st.markdown("---")
 
-if not user:
-    st.warning("로그인이 필요한 페이지입니다. 메인 페이지에서 먼저 로그인해 주세요.")
-elif "관리자" not in user["role"]:
+if "관리자" not in user.get("role", ""):
     st.error("관리자(CEO)만 접근할 수 있는 메뉴입니다.")
 else:
     tab1, tab2 = st.tabs(["👤 사용자 승인 및 권한 관리", "🏢 공통 코드 관리"])
