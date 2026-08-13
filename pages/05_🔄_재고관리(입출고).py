@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title="재고관리(입출고)", page_layout="wide")
+st.set_page_config(page_title="재고관리(입출고)", layout="wide")
 
 import datetime
 import io
