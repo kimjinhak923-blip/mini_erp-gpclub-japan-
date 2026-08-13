@@ -13,15 +13,12 @@ user = st.session_state.get("logged_in_user")
 st.title("📦 재고 입출고 및 출고 등록")
 st.markdown("---")
 
-tab1, tab2, tab3 = st.tabs(["📤 일반 출고 등록 (품목 동적 추가)", "📥 개별 입고 등록", "📁 엑셀 대량 업로드"])
+tab1, tab2, tab3 = st.tabs(["📤 일반 출고 등록 (제품/집기 선택)", "📥 개별 입고 등록", "📁 엑셀 대량 업로드"])
 
-# ==========================================
-# [TAB 1] 일반 출고 등록 (최대 30개 동적 추가)
-# ==========================================
+# --- [TAB 1] 출고 등록 ---
 with tab1:
     st.subheader("📋 출고 지시 및 발주 등록")
 
-    # 기본 정보 세션 유지
     if "out_items_count" not in st.session_state:
         st.session_state.out_items_count = 1
 
@@ -45,66 +42,87 @@ with tab1:
     st.write("##### 📦 출고 등록 품목 목록")
 
     master_prods = st.session_state.get("master_products", [])
-    prod_options = [f"{p['product_name']} ({p['jan_code']})" for p in master_prods]
+    master_fixs = st.session_state.get("master_fixtures", [])
+
+    prod_options = [f"{p['product_name']} (곽:{p.get('box_jan_code', p.get('jan_code',''))})" for p in master_prods]
+    fix_options = [f"{f['fixture_name']} (창고:{f['warehouse']})" for f in master_fixs]
 
     items_data = []
 
-    # 동적 품목 행 생성
     for i in range(st.session_state.out_items_count):
         st.markdown(f"**품목 #{i+1}**")
-        c_p, c_qty, c_box, c_price, c_amt, c_purp = st.columns([3, 1, 1, 1.5, 1.5, 1])
+        c_cat, c_p, c_qty, c_box, c_price, c_amt, c_purp = st.columns([1.2, 2.5, 1, 1, 1.2, 1.2, 1])
+
+        with c_cat:
+            item_cat = st.selectbox("구분", ["제품", "집기"], key=f"cat_{i}")
 
         with c_p:
-            selected_p_str = st.selectbox(f"상품 선택 #{i+1}", prod_options if prod_options else ["상품 없음"], key=f"p_select_{i}")
-            
-            # 선택된 상품 마스터 데이터 매칭
-            jan = selected_p_str.split("(")[-1].replace(")", "") if "(" in selected_p_str else ""
-            matched_p = next((p for p in master_prods if p["jan_code"] == jan), None)
-            
-            if matched_p:
-                st.caption(f"바코드(JAN): `{matched_p['jan_code']}`")
+            if item_cat == "제품":
+                selected_str = st.selectbox(f"상품 선택 #{i+1}", prod_options if prod_options else ["등록된 상품 없음"], key=f"p_select_{i}")
+                p_name = selected_str.split(" (")[0] if " (" in selected_str else selected_str
+                matched_p = next((p for p in master_prods if p["product_name"] == p_name), None)
+                jan_disp = matched_p.get("box_jan_code", matched_p.get("jan_code", "")) if matched_p else ""
+                single_jan = matched_p.get("single_jan_code", "-") if matched_p else "-"
+                st.caption(f"곽 JAN: `{jan_disp}` | 낱장 JAN: `{single_jan}`")
+            else:
+                selected_str = st.selectbox(f"집기 선택 #{i+1}", fix_options if fix_options else ["등록된 집기 없음"], key=f"f_select_{i}")
+                p_name = selected_str.split(" (")[0] if " (" in selected_str else selected_str
+                matched_p = next((f for f in master_fixs if f["fixture_name"] == p_name), None)
+                jan_disp = "-"
+                st.caption("🎪 집기 품목 (무상 출고)")
 
         with c_qty:
-            qty = st.number_input(f"수량 #{i+1}", min_value=1, value=60, key=f"qty_{i}")
+            qty = st.number_input(f"수량 #{i+1}", min_value=1, value=10, key=f"qty_{i}")
 
         with c_box:
-            units_per_box = matched_p["units_per_box"] if matched_p else 1
-            box_count = round(qty / units_per_box, 2)
-            st.text_input(f"Box 수량 #{i+1}", value=f"{box_count} Box ({units_per_box}/Box)", disabled=True, key=f"box_{i}")
+            if item_cat == "제품" and matched_p:
+                units_per_box = matched_p.get("units_per_box", 1)
+                box_count = round(qty / units_per_box, 2)
+                box_disp = f"{box_count} Box"
+            else:
+                box_count = 0
+                box_disp = "-"
+            st.text_input(f"Box 수량 #{i+1}", value=box_disp, disabled=True, key=f"box_{i}")
 
         with c_purp:
-            purpose = st.selectbox(f"용도 #{i+1}", ["납품", "FOC", "샘플"], key=f"purp_{i}")
+            if item_cat == "제품":
+                purpose = st.selectbox(f"용도 #{i+1}", ["납품", "FOC", "샘플"], key=f"purp_{i}")
+            else:
+                purpose = "집기출고"
+                st.text_input(f"용도 #{i+1}", value="집기출고", disabled=True, key=f"purp_dis_{i}")
 
         with c_price:
-            if purpose == "납품":
-                # 거래처 등록 단가 매칭
-                custom_p = next((cp for cp in st.session_state.get("client_products", []) if cp["client_name"] == sel_client and cp.get("jan_code") == jan), None)
+            if item_cat == "제품" and purpose == "납품":
+                custom_p = next((cp for cp in st.session_state.get("client_products", []) if cp["client_name"] == sel_client and cp.get("product_name") == p_name), None)
                 unit_price = custom_p["custom_supply_price"] if custom_p else (matched_p["supply_price_jpy"] if matched_p else 0)
                 price_disp = f"¥{unit_price:,.0f}"
                 calc_amt = unit_price * qty
+            elif item_cat == "제품":
+                unit_price = 0
+                price_disp = purpose
+                calc_amt = 0
             else:
                 unit_price = 0
-                price_disp = purpose  # FOC 또는 샘플로 출력
-                calc_amt = 0  # 합산 제외
+                price_disp = "무상(집기)"
+                calc_amt = 0
 
             st.text_input(f"공급단가 #{i+1}", value=price_disp, disabled=True, key=f"price_{i}")
 
         with c_amt:
-            amt_disp = f"¥{calc_amt:,.0f}" if purpose == "납품" else purpose
+            amt_disp = f"¥{calc_amt:,.0f}" if (item_cat == "제품" and purpose == "납품") else price_disp
             st.text_input(f"금액 #{i+1}", value=amt_disp, disabled=True, key=f"amt_{i}")
 
         items_data.append({
-            "p_name": matched_p["product_name"] if matched_p else "",
-            "jan": jan,
+            "item_category": item_cat,
+            "p_name": p_name,
+            "jan": jan_disp,
             "qty": qty,
             "box_qty": box_count,
             "unit_price": unit_price,
             "total_amount": calc_amt,
             "purpose": purpose,
-            "price_disp": price_disp
         })
 
-    # + 버튼 (최대 30개까지)
     col_btn1, col_btn2 = st.columns([1, 4])
     with col_btn1:
         if st.session_state.out_items_count < 30:
@@ -119,7 +137,6 @@ with tab1:
 
     st.markdown("---")
 
-    # 하단 총 합산 영역
     total_prod_count = len(items_data)
     total_out_qty = sum(item["qty"] for item in items_data)
     total_out_box = sum(item["box_qty"] for item in items_data)
@@ -129,7 +146,7 @@ with tab1:
     m1.metric("등록 품목 수", f"{total_prod_count:,} 개")
     m2.metric("총 출고 수량", f"{total_out_qty:,} 개")
     m3.metric("총 출고 Box 수량", f"{total_out_box:,.2f} Box")
-    m4.metric("총 발주 금액 (FOC/샘플 제외)", f"¥{total_order_amount:,.0f}")
+    m4.metric("총 발주 금액 (무상 제외)", f"¥{total_order_amount:,.0f}")
 
     if st.button("🚀 출고 확정 및 저장", type="primary", use_container_width=True):
         for item in items_data:
@@ -137,6 +154,7 @@ with tab1:
                 "date": str(order_date),
                 "delivery_date": str(delivery_date),
                 "type": "출고",
+                "item_category": item["item_category"],
                 "purpose": item["purpose"],
                 "jan_code": item["jan"],
                 "product_name": item["p_name"],
@@ -152,30 +170,27 @@ with tab1:
                 "destination": f"[{dest_name}] {dest_addr} (Tel: {dest_tel})",
                 "worker": user["name"] if user else "관리자",
             })
-            
-            # 재고 차감
-            stk = next((s for s in st.session_state.warehouse_stocks if s["warehouse"] == out_wh and s["jan_code"] == item["jan"]), None)
-            if stk:
-                stk["stock_qty"] -= item["qty"]
 
-        st.success("출고 처리 및 이력이 정상적으로 저장되었습니다!")
+            # 제품인 경우 재고 차감
+            if item["item_category"] == "제품":
+                stk = next((s for s in st.session_state.warehouse_stocks if s["warehouse"] == out_wh and s["jan_code"] == item["jan"]), None)
+                if stk:
+                    stk["stock_qty"] -= item["qty"]
+
+        st.success("출고 등록 완료 및 집기/제품 이력이 정상 등록되었습니다!")
         st.session_state.out_items_count = 1
         st.rerun()
 
-# ==========================================
-# [TAB 2] 개별 입고 등록 (매입/FOC & 매입단가 연동)
-# ==========================================
+# --- [TAB 2] 개별 입고 등록 ---
 with tab2:
     st.subheader("📥 개별 입고 등록")
-    
     in_wh = st.selectbox("입고 창고", ["SAGAWA", "L&K", "大吉商事"], key="in_wh_sel")
-    
     m_prods = st.session_state.get("master_products", [])
-    m_opts = [f"{p['product_name']} ({p['jan_code']})" for p in m_prods]
+    m_opts = [f"{p['product_name']} ({p.get('box_jan_code', p.get('jan_code',''))})" for p in m_prods]
     sel_in_prod = st.selectbox("상품 선택 (마스터 등록 상품)", m_opts if m_opts else ["상품 없음"])
     
-    jan_in = sel_in_prod.split("(")[-1].replace(")", "") if "(" in sel_in_prod else ""
-    matched_in_p = next((p for p in m_prods if p["jan_code"] == jan_in), None)
+    p_name_in = sel_in_prod.split(" (")[0] if " (" in sel_in_prod else sel_in_prod
+    matched_in_p = next((p for p in m_prods if p["product_name"] == p_name_in), None)
 
     col_i1, col_i2, col_i3 = st.columns(3)
     with col_i1:
@@ -186,17 +201,18 @@ with tab2:
     with col_i3:
         in_purpose = st.selectbox("용도", ["매입", "FOC"])
 
-    # 총 매입액 계산
     total_in_cost = in_qty * in_unit_cost if in_purpose == "매입" else 0
     st.info(f"💡 총 매입 금액: **¥{total_in_cost:,.0f}** ({'FOC 무상 입고' if in_purpose == 'FOC' else '자동 연산'})")
 
     if st.button("📥 입고 등록 실행", type="primary"):
+        jan_in = matched_in_p.get("box_jan_code", matched_in_p.get("jan_code", "")) if matched_in_p else ""
         st.session_state.stock_logs.append({
             "date": str(datetime.date.today()),
             "type": "입고",
+            "item_category": "제품",
             "purpose": in_purpose,
             "jan_code": jan_in,
-            "product_name": matched_in_p["product_name"] if matched_in_p else "",
+            "product_name": p_name_in,
             "qty": in_qty,
             "box_qty": round(in_qty / (matched_in_p["units_per_box"] if matched_in_p else 1), 2),
             "unit_price": in_unit_cost,
@@ -210,7 +226,6 @@ with tab2:
             "worker": user["name"] if user else "관리자",
         })
 
-        # 창고 재고 증가
         stk = next((s for s in st.session_state.warehouse_stocks if s["warehouse"] == in_wh and s["jan_code"] == jan_in), None)
         if stk:
             stk["stock_qty"] += in_qty
@@ -218,16 +233,14 @@ with tab2:
             st.session_state.warehouse_stocks.append({
                 "warehouse": in_wh,
                 "jan_code": jan_in,
-                "product_name": matched_in_p["product_name"] if matched_in_p else "",
+                "product_name": p_name_in,
                 "stock_qty": in_qty
             })
 
         st.success("입고 처리가 완료되었습니다.")
         st.rerun()
 
-# ==========================================
-# [TAB 3] 엑셀 대량 업로드 (기존 기능 유지)
-# ==========================================
+# --- [TAB 3] 엑셀 대량 업로드 ---
 with tab3:
     st.subheader("📁 1~2년치 입출고 데이터 엑셀 대량 업로드")
     template_df = pd.DataFrame([{
