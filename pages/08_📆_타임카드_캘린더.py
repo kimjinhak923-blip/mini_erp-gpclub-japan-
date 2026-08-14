@@ -49,7 +49,7 @@ if "user_vacation_info" not in st.session_state:
         "이대리": {"granted": 15.0, "used": 0.0},
     }
 
-# 근태 원본 데이터 (late_mins, early_mins 수동 지정 가능하도록 구조 유지)
+# 근태 원본 데이터
 if "attendance_logs" not in st.session_state:
     st.session_state.attendance_logs = [
         {
@@ -103,15 +103,9 @@ if "editing_date" not in st.session_state:
     st.session_state.editing_date = None
 
 # ==========================================
-# 2. ⏱️ 근무/잔업 정밀 계산 로직 (요청사항 반영)
+# 2. ⏱️ 근무/잔업 정밀 계산 로직
 # ==========================================
 def calculate_work_and_overtime(clock_in_str, clock_out_str, manual_break=None, manual_late=None, manual_early=None):
-    """
-    1. 근무시간: 출근시간 입력 시 09:00~18:00 기본 8.00시간 기준
-    2. 휴식시간: 8시간 근무 시에만 1.00시간, 미만 시 0.00시간
-    3. 잔업시간: 18:00 이후 계산 (숫자만 표기)
-    4. 지각/조퇴: 수동 입력값이 있으면 사용하고, 없으면 시간 차이로 자동 계산
-    """
     try:
         if not clock_in_str or not clock_out_str or clock_in_str.strip() in ["-", ""]:
             return 0.0, 0.0, 0, 0, 0.0, 0.0
@@ -128,7 +122,7 @@ def calculate_work_and_overtime(clock_in_str, clock_out_str, manual_break=None, 
         else:
             work_hours = 8.00
 
-        # 휴식시간 계산: 무조건 8시간 이상 근무시에만 1.00 적용
+        # 휴식시간 계산: 8시간 이상 근무시에만 1.00 적용
         if manual_break is not None and manual_break != "":
             break_hours = float(manual_break)
         else:
@@ -144,7 +138,7 @@ def calculate_work_and_overtime(clock_in_str, clock_out_str, manual_break=None, 
         # 총 근무시간 = 근무시간 + 잔업시간
         total_work_hours = round(work_hours + overtime_hours, 2)
 
-        # 지각 / 조퇴 계산 (수동 수정 지원)
+        # 지각 / 조퇴 계산
         if manual_late is not None:
             late_mins = int(manual_late)
         else:
@@ -160,27 +154,28 @@ def calculate_work_and_overtime(clock_in_str, clock_out_str, manual_break=None, 
         return 0.0, 0.0, 0, 0, 0.0, 0.0
 
 # ==========================================
-# 3. 사용자 권한 선택 & 상단 컨트롤
+# 3. 👤 사용자 권한 선택 & 상단 컨트롤 (드롭다운으로 직원 전환)
 # ==========================================
 user_list = [u["name"] for u in st.session_state.users]
-
-def on_target_user_change():
-    st.session_state.selected_target_user = st.session_state.sel_user_key
 
 if is_admin:
     col_adm1, col_adm2 = st.columns([2, 3])
     with col_adm1:
+        # 안전하게 선택 인덱스 조회
         current_idx = user_list.index(st.session_state.selected_target_user) if st.session_state.selected_target_user in user_list else 0
-        st.selectbox(
-            "👤 [관리자] 조회 및 수정 대상 직원 선택",
+        selected_user = st.selectbox(
+            "👤 [관리자] 타임카드/캘린더 조회 직원 선택",
             user_list,
             index=current_idx,
-            key="sel_user_key",
-            on_change=on_target_user_change
+            key="admin_user_selector"
         )
+        # 선택된 직원으로 세션 갱신
+        st.session_state.selected_target_user = selected_user
+
     with col_adm2:
-        st.info(f"🔑 관리자 권한 활성화: 현재 **[{st.session_state.selected_target_user}]** 님의 근태 및 타임카드를 관리합니다.")
+        st.info(f"🔑 관리자 권한 활성화: 현재 **[{st.session_state.selected_target_user}]** 님의 타임카드 및 캘린더를 조회 중입니다.")
 else:
+    st.session_state.selected_target_user = logged_user["name"]
     st.success(f"👤 **[{logged_user['name']}]** 님의 개인 타임카드 및 스케줄 화면입니다.")
 
 target_user = st.session_state.selected_target_user
@@ -227,7 +222,7 @@ with c_next:
 year = st.session_state.tc_year
 month = st.session_state.tc_month
 
-# [관리자] 대리 수정 팝업 (지각/조퇴 입력란 추가)
+# [관리자] 대리 수정 팝업
 with c_act1:
     if is_admin:
         with st.popover(f"⚡ [{target_user}] 대리 등록", use_container_width=True):
@@ -335,12 +330,11 @@ with c_act3:
                 st.rerun()
 
 # ==========================================
-# 5. 📊 [실시간 고정/잔업 계산] 최상단 월간 근태 통계 요약
+# 5. 📊 최상단 월간 근태 통계 요약 (선택된 직원 대상)
 # ==========================================
 weekdays_kr = ["월", "화", "수", "목", "금", "토", "일"]
 _, last_day = calendar.monthrange(year, month)
 
-# 월별 데이터 실시간 계산 집계
 tot_days = 0
 tot_work_h = 0.0
 tot_over_h = 0.0
@@ -363,7 +357,7 @@ for d in range(1, last_day + 1):
         if e_m > 0 or att.get("status") == "조퇴":
             tot_early_c += 1
 
-st.markdown(f"##### 📊 [{target_user}] 님 {year}년 {month}월 근태 통계 요약 (실시간 자동계산)")
+st.markdown(f"##### 📊 [{target_user}] 님 {year}년 {month}월 근태 통계 요약")
 m1, m2, m3, m4, m5 = st.columns(5)
 m1.metric("총 근무일수", f"{tot_days} 일")
 m2.metric("총 근무시간", f"{tot_work_h:.2f}")
@@ -372,10 +366,10 @@ m4.metric("지각 횟수", f"{tot_late_c} 회")
 m5.metric("조퇴 횟수", f"{tot_early_c} 회")
 
 # ==========================================
-# 6. 📅 캘린더 뷰 (2종 선택)
+# 6. 📅 캘린더 뷰 (선택된 직원 대상)
 # ==========================================
 st.markdown("---")
-st.subheader(f"📅 {year}년 {month}월 캘린더")
+st.subheader(f"📅 [{target_user}] 님 {year}년 {month}월 캘린더")
 
 cal_mode = st.selectbox(
     "🔄 캘린더 모드 선택",
@@ -408,8 +402,10 @@ if "1️⃣" in cal_mode:
                         att_day.get("clock_in"), att_day.get("clock_out"),
                         att_day.get("break_hours"), att_day.get("late_mins"), att_day.get("early_mins")
                     )
-                    box_content += f"⏰ `{att_day.get('clock_in','-')}~{att_day.get('clock_out','-')}`\n"
-                    box_content += f"⏱️ 근무: `{w_h:.2f}` (잔업 `{o_h:.2f}`)\n"
+                    # 요하신 줄바꿈 형식으로 적용된 부분
+                    box_content += f"⏰ {att_day.get('clock_in','-')}-{att_day.get('clock_out','-')}\n"
+                    box_content += f"⏱️ 근무: {w_h:.2f}\n"
+                    box_content += f"(잔업 {o_h:.2f})\n"
                     
                     if l_m > 0:
                         box_content += f"⚠️ `지각 {l_m}분` "
@@ -453,13 +449,12 @@ else:
                 day_counter += 1
 
 # ==========================================
-# 7. 📋 타임카드 테이블 & [1:1 계정 수정 스타일 인라인 편집]
+# 7. 📋 타임카드 테이블 (선택된 직원 대상)
 # ==========================================
 st.markdown("---")
 st.subheader(f"📋 [{target_user}] 님 일별 타임카드 상세 내역")
-st.caption("💡 각 행 오른쪽 **[✏️ 수정]** 버튼을 눌러 계정 관리처럼 출퇴근 시각 및 지각/조퇴 상태를 직접 수정할 수 있습니다.")
+st.caption("💡 각 행 오른쪽 **[✏️ 수정]** 버튼을 눌러 출퇴근 시각 및 지각/조퇴 상태를 직접 수정할 수 있습니다.")
 
-# 테이블 헤더 표시 (요청사항 반영: (h), (분) 단위 제거 및 총 근무시간 컬럼 추가)
 h_col1, h_col2, h_col3, h_col4, h_col5, h_col6, h_col7, h_col8, h_col9, h_col10, h_col11, h_col12 = st.columns([1.2, 1, 1, 1, 1, 1.2, 0.8, 0.8, 0.8, 1, 1.5, 0.8])
 h_col1.markdown("**날짜**")
 h_col2.markdown("**출근**")
@@ -475,20 +470,17 @@ h_col11.markdown("**비고**")
 h_col12.markdown("**수정**")
 st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
 
-# 행 단위 출력 및 수정 모듈
 for d in range(1, last_day + 1):
     curr_date = datetime.date(year, month, d)
     date_str = curr_date.strftime("%Y-%m-%d")
-    is_weekend_day = curr_date.weekday() in [5, 6] # 토(5), 일(6)
+    is_weekend_day = curr_date.weekday() in [5, 6]
     date_disp = f"{month}/{d}({weekdays_kr[curr_date.weekday()]})"
 
     att = next((a for a in st.session_state.attendance_logs if a["date"] == date_str and a.get("user_name") == target_user), None)
 
-    # 토/일요일 미기록 처리 로직
     if is_weekend_day and (not att or not att.get("clock_in") or att.get("clock_in") == "-"):
         c_in = "-"
         c_out = "-"
-        b_hrs = 0.0
         stat = "미기록"
         note = ""
         w_hrs, o_hrs, l_mins, e_mins, b_hrs, tot_w_hrs = 0.0, 0.0, 0, 0, 0.0, 0.0
@@ -501,7 +493,6 @@ for d in range(1, last_day + 1):
         stat = att.get("status", "미기록") if att else "미기록"
         note = att.get("note", "") if att else ""
 
-        # 요구사항에 맞춘 정밀 계산 (8시간 근무 시에만 1.00 휴식)
         w_hrs, o_hrs, l_mins, e_mins, b_hrs, tot_w_hrs = calculate_work_and_overtime(c_in, c_out, m_break, m_late, m_early)
 
     c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12 = st.columns([1.2, 1, 1, 1, 1, 1.2, 0.8, 0.8, 0.8, 1, 1.5, 0.8])
@@ -509,15 +500,14 @@ for d in range(1, last_day + 1):
     c2.write(c_in)
     c3.write(c_out)
     c4.write(f"**{w_hrs:.2f}**")
-    c5.write(f"**{o_hrs:.2f}**")  # 0.00 숫자로만 표기
-    c6.write(f"**{tot_w_hrs:.2f}**")  # 총 근무시간 (근무+잔업)
+    c5.write(f"**{o_hrs:.2f}**")
+    c6.write(f"**{tot_w_hrs:.2f}**")
     c7.write(str(l_mins))
     c8.write(str(e_mins))
-    c9.write(f"{b_hrs:.2f}")     # 8시간 이상 시 1.00, 미만 시 0.00
+    c9.write(f"{b_hrs:.2f}")
     c10.write(stat)
     c11.write(note)
 
-    # 계정 수정 스타일 인라인 토글 버튼
     if c12.button("✏️", key=f"btn_edit_{date_str}"):
         if st.session_state.editing_date == date_str:
             st.session_state.editing_date = None
@@ -525,7 +515,6 @@ for d in range(1, last_day + 1):
             st.session_state.editing_date = date_str
         st.rerun()
 
-    # 인라인 수정 폼 확장 (선택된 날짜 아래에 펼쳐짐 - 지각/조퇴 직접 수정 항목 추가)
     if st.session_state.editing_date == date_str:
         with st.container():
             st.info(f"🛠️ **[{date_disp}] 타임카드 직접 수정 (지각/조퇴 입력 지원)**")
@@ -534,8 +523,8 @@ for d in range(1, last_day + 1):
                 edit_in = ec1.text_input("출근시간", value=(c_in if c_in != "-" else "09:00"))
                 edit_out = ec2.text_input("퇴근시간", value=(c_out if c_out != "-" else "18:00"))
                 edit_break = ec3.number_input("휴식", value=b_hrs, step=0.5)
-                edit_late = ec4.number_input("지각", value=l_mins, step=1)    # 지각 수정 가능
-                edit_early = ec5.number_input("조퇴", value=e_mins, step=1)  # 조퇴 수정 가능
+                edit_late = ec4.number_input("지각", value=l_mins, step=1)
+                edit_early = ec5.number_input("조퇴", value=e_mins, step=1)
                 
                 status_opts = ["정상근무", "지각", "조퇴", "연장근무", "연차/휴가", "반차", "결근"]
                 s_idx = status_opts.index(stat) if stat in status_opts else 0
