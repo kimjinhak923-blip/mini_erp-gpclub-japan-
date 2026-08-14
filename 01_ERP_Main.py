@@ -1,15 +1,12 @@
 import streamlit as st
 
-# ⚠️ [필수] 모든 Streamlit 코드 중 최상단에 배치
 st.set_page_config(
     page_title="사내 통합 관리 시스템 (ERP)",
     page_layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ---------------------------------------------------------
-# [전체 세션 데이터 초기화 - 기존 기능 100% 보존]
-# ---------------------------------------------------------
+# --- 기본 세션 데이터 초기화 (기존 기능 100% 보존 + 신규 기능 세션) ---
 if "lang" not in st.session_state:
     st.session_state.lang = "한국어"
 
@@ -41,7 +38,7 @@ if "users" not in st.session_state:
     ]
 
 if "warehouses" not in st.session_state:
-    st.session_state.warehouses = ["도쿄 메인 창고", "오사카 물류 센터"]
+    st.session_state.warehouses = ["SAGAWA", "L&K", "大吉商事"]
 
 if "positions" not in st.session_state:
     st.session_state.positions = ["대표이사", "이사", "부장", "차장", "과장", "대리", "사원"]
@@ -63,9 +60,23 @@ if "master_products" not in st.session_state:
         }
     ]
 
+# 신규: 집기 마스터 세션
+if "master_fixtures" not in st.session_state:
+    st.session_state.master_fixtures = [
+        {
+            "fixture_name": "아크릴 매대 A타입",
+            "total_qty": 100,
+            "remaining_qty": 80,
+            "warehouse": "SAGAWA",
+            "total_cost": 500000,
+            "unit_cost": 5000,
+            "total_remaining_value": 400000,
+        }
+    ]
+
 if "warehouse_stocks" not in st.session_state:
     st.session_state.warehouse_stocks = [
-        {"warehouse": "도쿄 메인 창고", "jan_code": "4580000000001", "product_name": "프리미엄 수분 크림 50ml", "stock_qty": 150}
+        {"warehouse": "SAGAWA", "jan_code": "4580000000001", "product_name": "프리미엄 수분 크림 50ml", "stock_qty": 150}
     ]
 
 if "clients" not in st.session_state:
@@ -93,9 +104,7 @@ if "leave_records" not in st.session_state:
 if "company_holidays" not in st.session_state:
     st.session_state.company_holidays = []
 
-# ---------------------------------------------------------
-# [로그인 화면 및 분기]
-# ---------------------------------------------------------
+# --- 로그인 / 회원가입 UI ---
 if not st.session_state.logged_in_user:
     st.title("🏢 사내 통합 관리 시스템")
     st.markdown("---")
