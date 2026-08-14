@@ -1,5 +1,14 @@
 import streamlit as st
 from sidebar_menu import render_sidebar
+from utils.i18n import txt
+
+# 1. 공통 사이드바 및 언어선택기 호출
+render_sidebar()
+
+# 2. 페이지 헤더
+st.title(txt("menu_mypage", "👤 마이페이지"))
+
+# ... (이하 기존 마이페이지 로직 코드)
 
 # -----------------------------------------------------------------------------
 # 1. 다국어 사전 정의 (한국어 / 日本語 / English)
