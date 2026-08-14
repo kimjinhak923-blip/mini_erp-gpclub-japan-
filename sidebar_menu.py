@@ -38,3 +38,8 @@ def render_sidebar():
     if st.sidebar.button(txt("logout"), use_container_width=True):
         st.session_state.logged_in_user = None
         st.switch_page("01_ERP_Main.py")
+
+# sidebar_menu.py 내부 적절한 위치 (예: render_sidebar 함수 내부)
+from i18n import render_language_selector
+
+render_language_selector()  # 사이드바 상단/하단에 언어 선택 드롭다운 자동 표시
