@@ -1,158 +1,167 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
+# ==========================================
+# 🌐 ERP 통합 다국어 번역 사전 (i18n)
+# ==========================================
 I18N = {
-    "KO": {
-        "title": "ERP 시스템",
-        "lang_select": "언어 선택 / Language",
-        "nav_dashboard": "📊 메인 대시보드",
-        "nav_master": "⚙️ 마스터 관리 (제품/거래처)",
-        "nav_order": "📦 출고/납품 작성 (최대 30개)",
-        "nav_inventory": "🏢 창고별 재고 및 위탁 현황",
-        "nav_hr": "⏰ 근태 및 인사 관리",
+    "한국어": {
+        # 메인 및 시스템 공통
+        "system_title": "🏢 사내 통합 관리 시스템 (ERP)",
+        "auth_center": "🔐 인증 센터",
+        "login": "로그인",
+        "signup": "회원가입",
+        "user_id": "사원번호 또는 아이디",
+        "password": "비밀번호",
+        "name": "이름 (성명)",
+        "preferred_lang": "기본 언어 선택",
+        "signup_btn": "가입 신청",
+        "pending_approval": "아직 관리자 승인이 완료되지 않은 계정입니다.",
+        "login_fail": "아이디 또는 비밀번호가 올바르지 않습니다.",
+        "signup_success": "회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인할 수 있습니다.",
+        "fill_all": "모든 항목을 입력해주세요.",
+        "logout": "🚪 로그아웃",
+        "logged_in_as": "👤 **{name}** ({role}) 님",
+        "live_clock": "⏱️ 실시간 서버 시계",
         
-        "dashboard_title": "📊 매출 Analytics & 대시보드",
-        "tab_monthly": "📅 월별 조회 (연도/월)",
-        "tab_detail": "🔍 상세 기간 조회 (프셋 선택)",
-        "select_year": "연도 선택",
-        "select_month": "월 선택",
-        "preset_select": "조회 기간 프셋",
-        "preset_1d": "1일 (오늘)",
-        "preset_1w": "1주일",
-        "preset_1m": "1달",
-        "preset_1y": "1년",
-        "preset_custom": "직접 범위 지정",
+        # 사이드바 메뉴명
+        "menu_commute": "⏱️ 출퇴근 시스템",
+        "menu_dashboard": "📊 대시보드",
+        "menu_sales": "💰 매출 관리",
+        "menu_inout_history": "📜 입출고 이력 조회",
+        "menu_inventory": "📦 재고 관리 (입출고)",
+        "menu_clients": "🏢 거래처 관리",
+        "menu_products": "🏷️ 마스터 상품 관리",
+        "menu_timecard": "📅 타임카드 / 캘린더",
+        "menu_system": "⚙️ 시스템 관리",
+        "menu_mypage": "👤 마이페이지",
         
-        "order_title": "📦 출고 및 납품 작성",
-        "order_no": "발주번호",
-        "partner_select": "거래처 선택",
-        "delivery_dest": "납품처 정보",
-        "deliv_name": "납품처명",
-        "deliv_zip": "우편번호",
-        "deliv_addr": "주소",
-        "deliv_phone": "전화번호",
-        "order_date": "발주일",
-        "delivery_date": "납품지정일",
-        "wh_select": "출고창고 선택",
-        "item_list": "납품 제품 목록 (최대 30개)",
-        "unit_price": "공급단가 (JPY)",
-        "qty": "수량",
-        "box_qty": "Box 수량",
-        "total_amount": "공급가 (JPY)",
-        "grand_total_qty": "최종 총 발주량",
-        "grand_total_amount": "최종 총 공급가액 (JPY, VAT별도)",
-        "submit_order": "🚀 발주 및 출고 등록",
-        "no_stock_warn": "선택한 창고에 재고가 있는 거래처 등록 제품만 표시됩니다."
+        # 공통 버튼 및 라벨
+        "save": "저장",
+        "cancel": "취소",
+        "edit": "수정",
+        "delete": "삭제",
+        "search": "검색",
+        "confirm": "확인",
+        "status": "상태",
+        "note": "비고",
+        "date": "날짜",
     },
-    "JA": {
-        "title": "ERP システム",
-        "lang_select": "言語選択 / Language",
-        "nav_dashboard": "📊 メインダッシュボード",
-        "nav_master": "⚙️ マスタ管理 (商品/取引先)",
-        "nav_order": "📦 出荷・納品作成 (最大30件)",
-        "nav_inventory": "🏢 倉庫別在庫・委託状況",
-        "nav_hr": "⏰ 勤怠・人事管理",
+    "English": {
+        # Main & Common
+        "system_title": "🏢 Enterprise Resource Planning (ERP)",
+        "auth_center": "🔐 Authentication Center",
+        "login": "Login",
+        "signup": "Sign Up",
+        "user_id": "Employee ID or Username",
+        "password": "Password",
+        "name": "Full Name",
+        "preferred_lang": "Preferred Language",
+        "signup_btn": "Apply for Account",
+        "pending_approval": "This account is pending administrator approval.",
+        "login_fail": "Invalid ID or Password.",
+        "signup_success": "Registration submitted. You can log in after admin approval.",
+        "fill_all": "Please fill in all fields.",
+        "logout": "🚪 Logout",
+        "logged_in_as": "👤 **{name}** ({role})",
+        "live_clock": "⏱️ Real-time Clock",
         
-        "dashboard_title": "📊 売上アナリティクス & ダッシュボード",
-        "tab_monthly": "📅 月別照会 (年/月)",
-        "tab_detail": "🔍 詳細期間照会 (プリセット)",
-        "select_year": "年選択",
-        "select_month": "月選択",
-        "preset_select": "照会期間プリセット",
-        "preset_1d": "1日 (本日)",
-        "preset_1w": "1週間",
-        "preset_1m": "1ヶ月",
-        "preset_1y": "1年",
-        "preset_custom": "直接指定",
+        # Sidebar Menus
+        "menu_commute": "⏱️ Clock In/Out System",
+        "menu_dashboard": "📊 Dashboard",
+        "menu_sales": "💰 Sales Management",
+        "menu_inout_history": "📜 In/Out History",
+        "menu_inventory": "📦 Inventory Management",
+        "menu_clients": "🏢 Client Management",
+        "menu_products": "🏷️ Master Product Catalog",
+        "menu_timecard": "📅 Timecard & Calendar",
+        "menu_system": "⚙️ System Administration",
+        "menu_mypage": "👤 My Page",
         
-        "order_title": "📦 出荷・納品作成",
-        "order_no": "発注番号",
-        "partner_select": "取引先選択",
-        "delivery_dest": "納品先情報",
-        "deliv_name": "納品先名",
-        "deliv_zip": "郵便番号",
-        "deliv_addr": "住所",
-        "deliv_phone": "電話番号",
-        "order_date": "発注日",
-        "delivery_date": "納品指定日",
-        "wh_select": "出荷倉庫選択",
-        "item_list": "納品商品リスト (最大30件)",
-        "unit_price": "供給単価 (JPY)",
-        "qty": "数量",
-        "box_qty": "Box 数量",
-        "total_amount": "供給価額 (JPY)",
-        "grand_total_qty": "最終総発注量",
-        "grand_total_amount": "最終総供給金額 (JPY, VAT別)",
-        "submit_order": "🚀 発注・出荷登録",
-        "no_stock_warn": "選択した倉庫に在庫がある取引先登録商品のみ表示されます。"
+        # Common Buttons & Labels
+        "save": "Save",
+        "cancel": "Cancel",
+        "edit": "Edit",
+        "delete": "Delete",
+        "search": "Search",
+        "confirm": "Confirm",
+        "status": "Status",
+        "note": "Note",
+        "date": "Date",
     },
-    "EN": {
-        "title": "ERP System",
-        "lang_select": "Language",
-        "nav_dashboard": "📊 Main Dashboard",
-        "nav_master": "⚙️ Master Management",
-        "nav_order": "📦 Delivery Order (Max 30)",
-        "nav_inventory": "🏢 Inventory & Consignment",
-        "nav_hr": "⏰ HR Management",
+    "日本語": {
+        # メインおよび共通
+        "system_title": "🏢 社内統合管理システム (ERP)",
+        "auth_center": "🔐 認証センター",
+        "login": "ログイン",
+        "signup": "新規会員登録",
+        "user_id": "社員番号またはID",
+        "password": "パスワード",
+        "name": "氏名",
+        "preferred_lang": "デフォルト言語選択",
+        "signup_btn": "登録申請",
+        "pending_approval": "まだ管理者の承認が完了していないアカウントです。",
+        "login_fail": "IDまたはパスワードが正しくありません。",
+        "signup_success": "会員登録の申請が完了しました。管理者の承認後にログインできます。",
+        "fill_all": "すべての項目を入力してください。",
+        "logout": "🚪 ログアウト",
+        "logged_in_as": "👤 **{name}** ({role}) 様",
+        "live_clock": "⏱️ リアルタイム時計",
         
-        "dashboard_title": "📊 Sales Analytics & Dashboard",
-        "tab_monthly": "📅 Monthly View (Year/Month)",
-        "tab_detail": "🔍 Detailed Date Range (Presets)",
-        "select_year": "Select Year",
-        "select_month": "Select Month",
-        "preset_select": "Date Range Preset",
-        "preset_1d": "1 Day (Today)",
-        "preset_1w": "1 Week",
-        "preset_1m": "1 Month",
-        "preset_1y": "1 Year",
-        "preset_custom": "Custom Range",
+        # サイドバーメニュー名
+        "menu_commute": "⏱️ 出退勤システム",
+        "menu_dashboard": "📊 ダッシュボード",
+        "menu_sales": "💰 売上管理",
+        "menu_inout_history": "📜 入出庫履歴照会",
+        "menu_inventory": "📦 在庫管理 (入出庫)",
+        "menu_clients": "🏢 取引先管理",
+        "menu_products": "🏷️ マスター商品管理",
+        "menu_timecard": "📅 タイムカード / カレンダー",
+        "menu_system": "⚙️ システム管理",
+        "menu_mypage": "👤 マイページ",
         
-        "order_title": "📦 Delivery Order Entry",
-        "order_no": "Order No.",
-        "partner_select": "Select Partner",
-        "delivery_dest": "Delivery Destination",
-        "deliv_name": "Recipient Name",
-        "deliv_zip": "Zipcode",
-        "deliv_addr": "Address",
-        "deliv_phone": "Phone Number",
-        "order_date": "Order Date",
-        "delivery_date": "Delivery Date",
-        "wh_select": "Source Warehouse",
-        "item_list": "Product Items (Max 30)",
-        "unit_price": "Unit Price (JPY)",
-        "qty": "Quantity",
-        "box_qty": "Box Count",
-        "total_amount": "Supply Total (JPY)",
-        "grand_total_qty": "Grand Total Qty",
-        "grand_total_amount": "Grand Total Amount (JPY, Excl. VAT)",
-        "submit_order": "🚀 Submit Order",
-        "no_stock_warn": "Only displays partner products with available stock in selected warehouse."
+        # 共通ボタンおよびラベル
+        "save": "保存",
+        "cancel": "キャンセル",
+        "edit": "修正",
+        "delete": "削除",
+        "search": "検索",
+        "confirm": "確認",
+        "status": "状態",
+        "note": "備考",
+        "date": "日付",
     }
 }
 
-def get_lang():
-    if "lang" not in st.session_state:
-        st.session_state["lang"] = "KO"
-    return st.session_state["lang"]
+def txt(key, **kwargs):
+    """현재 세션 언어에 맞는 텍스트를 반환하는 다국어 함수"""
+    lang = st.session_state.get("lang", "한국어")
+    text_dict = I18N.get(lang, I18N["한국어"])
+    raw = text_dict.get(key, I18N["한국어"].get(key, key))
+    if isinstance(raw, str) and kwargs:
+        return raw.format(**kwargs)
+    return raw
 
-def t(key):
-    lang = get_lang()
-    return I18N.get(lang, {}).get(key, I18N["KO"].get(key, key))
-
-def render_lang_selector():
-    lang_options = {"한국어": "KO", "日本語": "JA", "English": "EN"}
-    current_lang = get_lang()
-    current_label = [k for k, v in lang_options.items() if v == current_lang][0]
-    
-    selected = st.sidebar.selectbox(
-        t("lang_select"),
-        options=list(lang_options.keys()),
-        index=list(lang_options.keys()).index(current_label),
-        key="unique_global_sidebar_lang_selector"
-    )
-    if lang_options[selected] != current_lang:
-        st.session_state["lang"] = lang_options[selected]
-        st.rerun()
-
-def render_sidebar():
-    st.sidebar.title(t("title"))
-    render_lang_selector()
+def render_live_clock():
+    """초 단위 실시간 디지털 시계 컴포넌트"""
+    clock_html = """
+    <div style="background-color: #1A202C; color: #63B3ED; padding: 8px 15px; border-radius: 8px; font-family: 'Courier New', Courier, monospace; font-size: 1.1rem; font-weight: bold; display: inline-block; border: 1px solid #2B6CB0; text-align: center;">
+        <span id="live_clock_display">0000-00-00 00:00:00</span>
+    </div>
+    <script>
+        function updateClock() {
+            var now = new Date();
+            var yyyy = now.getFullYear();
+            var mm = String(now.getMonth() + 1).padStart(2, '0');
+            var dd = String(now.getDate()).padStart(2, '0');
+            var hh = String(now.getHours()).padStart(2, '0');
+            var mi = String(now.getMinutes()).padStart(2, '0');
+            var ss = String(now.getSeconds()).padStart(2, '0');
+            var str = yyyy + '-' + mm + '-' + dd + ' ' + hh + ':' + mi + ':' + ss;
+            document.getElementById('live_clock_display').textContent = str;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
+    """
+    components.html(clock_html, height=50)
