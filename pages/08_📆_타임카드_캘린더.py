@@ -68,7 +68,7 @@ if "attendance_logs" not in st.session_state:
         {
             "user_name": "김사원", "date": "2026-08-05",
             "clock_in": "09:00", "clock_out": "16:30",
-            "break_hours": 0.0, "status": "조퇴", "note": "병원 진료",
+            "break_hours": 1.0, "status": "조퇴", "note": "병원 진료",
             "late_mins": 0, "early_mins": 90
         },
         {
@@ -110,7 +110,7 @@ JAPAN_HOLIDAYS = [
 ]
 
 # ==========================================
-# 2. ⏱️ 근무/잔업 정밀 계산 로직
+# 2. ⏱️ 근무/잔업 정밀 계산 로직 (수정됨)
 # ==========================================
 def calculate_work_and_overtime(clock_in_str, clock_out_str, manual_break=None, manual_late=None, manual_early=None):
     try:
@@ -121,11 +121,16 @@ def calculate_work_and_overtime(clock_in_str, clock_out_str, manual_break=None, 
         t_out = datetime.datetime.strptime(clock_out_str.strip(), "%H:%M")
         t_std_in = datetime.datetime.strptime("09:00", "%H:%M")
         t_std_out = datetime.datetime.strptime("18:00", "%H:%M")
+        t_noon = datetime.datetime.strptime("12:00", "%H:%M")
 
         total_presence = max(0.0, (t_out - t_in).total_seconds() / 3600.0)
 
-        if manual_break is not None and manual_break != "":
+        # [수정된 휴식시간 로직] 
+        # 수동입력값이 양수인 경우 적용, 그렇지 않은 경우 오전 출근 후 12시 이후 퇴근이면 무조건 1.0시간
+        if manual_break is not None and manual_break != "" and float(manual_break) > 0:
             break_hours = float(manual_break)
+        elif t_in < t_noon and t_out > t_noon:
+            break_hours = 1.00
         else:
             break_hours = 1.00 if total_presence >= 8.0 else 0.00
 
@@ -160,7 +165,7 @@ def calculate_work_and_overtime(clock_in_str, clock_out_str, manual_break=None, 
         return 0.0, 0.0, 0, 0, 0.0, 0.0
 
 # ==========================================
-# 3. 👤 직원별 타임카드 선택 드롭다운 (추가/강화)
+# 3. 👤 직원별 타임카드 선택 드롭다운
 # ==========================================
 user_list = [u["name"] for u in st.session_state.users]
 
@@ -369,7 +374,7 @@ m4.metric("지각 횟수", f"{tot_late_c} 회")
 m5.metric("조퇴 횟수", f"{tot_early_c} 회")
 
 # ==========================================
-# 6. 📅 캘린더 뷰 (수정사항 1 반영: 근무/근태 캘린더 시인성 보정)
+# 6. 📅 캘린더 뷰
 # ==========================================
 st.markdown("---")
 st.subheader(f"📅 [{target_user}] 님 {year}년 {month}월 캘린더")
@@ -399,7 +404,6 @@ if "1️⃣" in cal_mode:
                 curr_d_str = f"{year}-{month:02d}-{day_counter:02d}"
                 att_day = next((a for a in st.session_state.attendance_logs if a["date"] == curr_d_str and a.get("user_name") == target_user), None)
 
-                # [수정 1] 배경색 대비를 명확히 하여 글자가 또렷하게 보이도록 CSS 보정
                 if att_day and att_day.get("clock_in") and att_day.get("clock_in") != "-":
                     w_h, o_h, l_m, e_m, b_h, t_w_h = calculate_work_and_overtime(
                         att_day.get("clock_in"), att_day.get("clock_out"),
@@ -467,7 +471,7 @@ else:
                 day_counter += 1
 
 # ==========================================
-# 7. 📋 타임카드 테이블 (수정사항 2 반영: 주말/공휴일 색상 강조 및 기본 휴무일 상태)
+# 7. 📋 타임카드 테이블
 # ==========================================
 st.markdown("---")
 st.subheader(f"📋 [{target_user}] 님 일별 타임카드 상세 내역")
@@ -493,7 +497,6 @@ for d in range(1, last_day + 1):
     date_str = curr_date.strftime("%Y-%m-%d")
     weekday_num = curr_date.weekday() # 0:월 ~ 5:토, 6:일
     
-    # [수정 2] 토요일, 일요일, 일본 공휴일 연동 판단 로직
     is_saturday = (weekday_num == 5)
     is_sunday = (weekday_num == 6)
     is_japan_holiday = (date_str in JAPAN_HOLIDAYS)
@@ -501,7 +504,6 @@ for d in range(1, last_day + 1):
 
     att = next((a for a in st.session_state.attendance_logs if a["date"] == date_str and a.get("user_name") == target_user), None)
 
-    # [수정 2] 주말/공휴일 기본 상태를 '휴무일'로 설정 (출퇴근 기록이 없는 경우)
     if is_off_day and (not att or not att.get("clock_in") or att.get("clock_in") == "-"):
         c_in = "-"
         c_out = "-"
@@ -515,14 +517,12 @@ for d in range(1, last_day + 1):
         m_late = att.get("late_mins") if att else None
         m_early = att.get("early_mins") if att else None
         
-        # 주말/공휴일 기록이 기본 '미기록'인 경우에도 '휴무일'로 우선 표시
         default_stat_val = "휴무일" if is_off_day else "미기록"
         stat = att.get("status", default_stat_val) if att else default_stat_val
         note = att.get("note", "") if att else ""
 
         w_hrs, o_hrs, l_mins, e_mins, b_hrs, tot_w_hrs = calculate_work_and_overtime(c_in, c_out, m_break, m_late, m_early)
 
-    # [수정 2] 토요일(파란계열), 일요일/공휴일(붉은계열) 가시성 스타일 적용
     date_label = f"{month}/{d}({weekdays_kr[weekday_num]})"
     if is_saturday:
         date_disp = f"<span style='color: #1D4ED8; font-weight: bold; background-color: #EFF6FF; padding: 2px 6px; border-radius: 4px;'>{date_label}</span>"
@@ -544,7 +544,6 @@ for d in range(1, last_day + 1):
     c8.write(str(e_mins))
     c9.write(f"{b_hrs:.2f}")
     
-    # 상태 열 텍스트 스타일링 (휴무일 강조)
     if stat == "휴무일":
         c10.markdown(f"<span style='color: #718096; font-weight: bold;'>{stat}</span>", unsafe_allow_html=True)
     else:
