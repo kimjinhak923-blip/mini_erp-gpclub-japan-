@@ -96,13 +96,13 @@ else:
         ]
     )
 
-    # -------------------------------------------------------------------------
-    # TAB 1: 전체 출고 내역 (총 출고량/발주금액 표기 & FOC/샘플 구분 표기)
+# -------------------------------------------------------------------------
+    # TAB 1: 전체 출고 내역 및 통합 집계 (JAN코드/상품명/용도별 자동 합산)
     # -------------------------------------------------------------------------
     with tab1:
         st.subheader("전체 출고 내역 및 통합 집계")
 
-        # 검색조건 기준 총 출고량 및 발주금액 계산
+        # 검색조건 기준 전체 총 출고량 및 발주금액
         total_out_qty = int(out_df["qty"].sum())
         total_out_amount = int(out_df["total_amount"].sum())
 
@@ -112,14 +112,18 @@ else:
             f"💰 **조회 기간 내 총 발주금액합계:** `¥{total_out_amount:,}`"
         )
 
-        display_tab1_df = out_df.copy()
-        if not display_tab1_df.empty:
-            display_tab1_df["date"] = display_tab1_df["date"].dt.strftime(
-                "%Y-%m-%d"
+        if not out_df.empty:
+            # 1. JAN코드, 상품명, 용도 기준으로 수량 및 금액 자동 합산
+            grouped_tab1 = (
+                out_df.groupby(["jan_code", "product_name", "purpose"])[
+                    ["qty", "total_amount"]
+                ]
+                .sum()
+                .reset_index()
             )
 
-            # 납품건이 아닌 경우 표기 분기 처리
-            def format_amount(row):
+            # 2. 용도별 금액 표기 분기 처리 (FOC / 샘플 / 유상 납품)
+            def format_grouped_amount(row):
                 if row["purpose"] == "FOC":
                     return "FOC (¥0)"
                 elif row["purpose"] == "샘플":
@@ -127,42 +131,38 @@ else:
                 else:
                     return f"¥{int(row['total_amount']):,}"
 
-            display_tab1_df["금액_표기"] = display_tab1_df.apply(
-                format_amount, axis=1
+            grouped_tab1["총 발주금액"] = grouped_tab1.apply(
+                format_grouped_amount, axis=1
             )
-            display_tab1_df["qty_fmt"] = display_tab1_df["qty"].apply(
-                lambda x: f"{int(x):,}"
+            grouped_tab1["총 출고수량"] = grouped_tab1["qty"].apply(
+                lambda x: f"{int(x):,} 개"
             )
-            display_tab1_df["unit_price_fmt"] = display_tab1_df[
-                "unit_price"
-            ].apply(lambda x: f"¥{int(x):,}")
 
-            show_tab1 = display_tab1_df[
-                [
-                    "jan_code",
-                    "product_name",
-                    "purpose",
-                    "qty_fmt",
-                    "unit_price_fmt",
-                    "금액_표기",
-                    "warehouse",
+            # 3. 테이블 출력 컬럼 정리 및 정렬
+            show_tab1 = (
+                grouped_tab1[
+                    [
+                        "jan_code",
+                        "product_name",
+                        "purpose",
+                        "총 출고수량",
+                        "총 발주금액",
+                    ]
                 ]
-            ].rename(
-                columns={
-                    "jan_code": "JAN코드",
-                    "product_name": "상품명",
-                    "purpose": "용도",
-                    "qty_fmt": "수량",
-                    "unit_price_fmt": "단가",
-                    "금액_표기": "매출금액",
-                    "warehouse": "출고창고",
-                }
+                .rename(
+                    columns={
+                        "jan_code": "JAN코드",
+                        "product_name": "상품명",
+                        "purpose": "용도",
+                    }
+                )
+                .sort_values(by=["JAN코드", "용도"])
             )
 
             st.dataframe(show_tab1, use_container_width=True)
         else:
             st.warning("조건에 해당하는 출고 데이터가 없습니다.")
-
+            
     # -------------------------------------------------------------------------
     # TAB 2: 거래처별 상세 조회 (드롭다운 선택 및 필터 맞춤 제품 출력)
     # -------------------------------------------------------------------------
