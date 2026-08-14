@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title="타임카드 캘린더", page_layout="wide")
+st.set_page_config(page_title="타임카드 캘린더", layout="wide")
 
 import pandas as pd
 from sidebar_menu import render_sidebar
