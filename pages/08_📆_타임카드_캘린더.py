@@ -16,12 +16,13 @@ st.title("📅 타임카드 관리 및 스케줄/사내 캘린더")
 st.markdown("---")
 
 # ==========================================
-# 1. 세션 상태(Session State) 강제 초기화 & 데이터 연동
+# 1. 세션 상태(Session State) 강제 초기화
 # ==========================================
+today = datetime.date.today()
 if "tc_year" not in st.session_state:
-    st.session_state.tc_year = 2026
+    st.session_state.tc_year = today.year
 if "tc_month" not in st.session_state:
-    st.session_state.tc_month = 8
+    st.session_state.tc_month = today.month
 
 if "users" not in st.session_state:
     st.session_state.users = [
@@ -50,6 +51,50 @@ if "user_vacation_info" not in st.session_state:
         "이대리": {"granted": 15.0, "used": 0.0},
     }
 
+# 근태/타임카드 원본 데이터 (세부 항목 전체 풀 세트)
+if "attendance_logs" not in st.session_state:
+    st.session_state.attendance_logs = [
+        {
+            "user_name": "관리자", "date": "2026-08-03",
+            "clock_in": "08:50", "clock_out": "18:30",
+            "work_hours": 8.0, "overtime_hours": 0.5, "break_hours": 1.0,
+            "late_minutes": 0, "early_leave_minutes": 0,
+            "late": False, "early_leave": False,
+            "status": "정상근무", "note": ""
+        },
+        {
+            "user_name": "김사원", "date": "2026-08-03",
+            "clock_in": "09:20", "clock_out": "18:00",
+            "work_hours": 7.67, "overtime_hours": 0.0, "break_hours": 1.0,
+            "late_minutes": 20, "early_leave_minutes": 0,
+            "late": True, "early_leave": False,
+            "status": "지각", "note": "교통 체증"
+        },
+        {
+            "user_name": "김사원", "date": "2026-08-05",
+            "clock_in": "09:00", "clock_out": "16:30",
+            "work_hours": 6.5, "overtime_hours": 0.0, "break_hours": 1.0,
+            "late_minutes": 0, "early_leave_minutes": 90,
+            "late": False, "early_leave": True,
+            "status": "조퇴", "note": "병원 진료"
+        },
+        {
+            "user_name": "이대리", "date": "2026-08-04",
+            "clock_in": "08:45", "clock_out": "20:00",
+            "work_hours": 8.0, "overtime_hours": 2.0, "break_hours": 1.0,
+            "late_minutes": 0, "early_leave_minutes": 0,
+            "late": False, "early_leave": False,
+            "status": "연장근무", "note": "프로젝트 마감"
+        },
+    ]
+
+# 사내 공유 일정 데이터
+if "company_schedules" not in st.session_state:
+    st.session_state.company_schedules = [
+        {"id": 1, "creator": "김사원", "date": "2026-08-05", "time": "14:00~15:30", "title": "A상사 외부 미팅", "category": "외부미팅"},
+        {"id": 2, "creator": "이대리", "date": "2026-08-12", "time": "10:00~11:00", "title": "대회의실 신제품 회의", "category": "회의실사용"},
+    ]
+
 # 휴가 신청 및 승인 이력
 if "schedule_requests" not in st.session_state:
     st.session_state.schedule_requests = [
@@ -77,66 +122,45 @@ if "schedule_requests" not in st.session_state:
         }
     ]
 
-# 근태/타임카드 원본 데이터 (상세 항목 풀 세트)
-if "attendance_logs" not in st.session_state:
-    st.session_state.attendance_logs = [
-        {
-            "user_name": "관리자", "date": "2026-08-03",
-            "clock_in": "08:50", "clock_out": "18:30",
-            "work_hours": 8.0, "overtime": 0.5, "break_time": 1.0,
-            "late": False, "early_leave": False, "status": "정상근무", "note": ""
-        },
-        {
-            "user_name": "김사원", "date": "2026-08-03",
-            "clock_in": "09:15", "clock_out": "18:00",
-            "work_hours": 7.75, "overtime": 0.0, "break_time": 1.0,
-            "late": True, "early_leave": False, "status": "지각", "note": "교통 체증"
-        },
-        {
-            "user_name": "김사원", "date": "2026-08-05",
-            "clock_in": "09:00", "clock_out": "15:00",
-            "work_hours": 5.0, "overtime": 0.0, "break_time": 1.0,
-            "late": False, "early_leave": True, "status": "조퇴", "note": "병원 진료"
-        },
-        {
-            "user_name": "이대리", "date": "2026-08-04",
-            "clock_in": "08:45", "clock_out": "20:00",
-            "work_hours": 8.0, "overtime": 2.0, "break_time": 1.0,
-            "late": False, "early_leave": False, "status": "연장근무", "note": "프로젝트 마감"
-        },
-    ]
-
-# 사내 공유 일정 데이터
-if "company_schedules" not in st.session_state:
-    st.session_state.company_schedules = [
-        {"id": 1, "creator": "김사원", "date": "2026-08-05", "time": "14:00~15:30", "title": "A상사 외부 미팅", "category": "외부미팅"},
-        {"id": 2, "creator": "이대리", "date": "2026-08-12", "time": "10:00~11:00", "title": "대회의실 신제품 회의", "category": "회의실사용"},
-    ]
-
 # ==========================================
-# 2. 보조 시간 계산 함수 (시간 자동 계산 로직)
+# 2. ⏱️ 정밀 시간 계산 보조 함수
 # ==========================================
-def calculate_work_and_overtime(clock_in_str, clock_out_str, break_time_hrs=1.0):
-    """출퇴근 시간을 파싱하여 총 근무시간 및 잔업시간을 자동으로 계산"""
+def calculate_attendance_details(clock_in_str, clock_out_str, break_hrs=1.0, std_in="09:00", std_out="18:00"):
+    """출퇴근 시간을 파싱하여 근무시간, 잔업시간, 지각(분), 조퇴(분)를 정확하게 계산"""
     try:
+        if not clock_in_str or not clock_out_str or clock_in_str.strip() == "-" or clock_out_str.strip() == "-":
+            return 0.0, 0.0, 0, 0, False, False
+
         t_in = datetime.datetime.strptime(clock_in_str.strip(), "%H:%M")
         t_out = datetime.datetime.strptime(clock_out_str.strip(), "%H:%M")
+        t_std_in = datetime.datetime.strptime(std_in, "%H:%M")
+        t_std_out = datetime.datetime.strptime(std_out, "%H:%M")
+
         if t_out <= t_in:
-            return 0.0, 0.0
-        
-        diff_hours = (t_out - t_in).total_seconds() / 3600.0
-        actual_work = max(0.0, diff_hours - break_time_hrs)
-        
-        # 8시간 초과분은 잔업시간으로 계산
+            return 0.0, 0.0, 0, 0, False, False
+
+        # 지각 계산 (분 단위)
+        late_mins = max(0, int((t_in - t_std_in).total_seconds() // 60)) if t_in > t_std_in else 0
+        is_late = late_mins > 0
+
+        # 조퇴 계산 (분 단위)
+        early_mins = max(0, int((t_std_out - t_out).total_seconds() // 60)) if t_out < t_std_out else 0
+        is_early = early_mins > 0
+
+        # 근무시간 & 잔업시간 계산 (휴식시간 제함)
+        diff_hrs = (t_out - t_in).total_seconds() / 3600.0
+        actual_work = max(0.0, diff_hrs - break_hrs)
+
         if actual_work > 8.0:
-            regular_work = 8.0
-            overtime = actual_work - 8.0
+            work_hrs = 8.0
+            overtime_hrs = actual_work - 8.0
         else:
-            regular_work = actual_work
-            overtime = 0.0
-        return round(regular_work, 2), round(overtime, 2)
+            work_hrs = actual_work
+            overtime_hrs = 0.0
+
+        return round(work_hrs, 2), round(overtime_hrs, 2), late_mins, early_mins, is_late, is_early
     except Exception:
-        return 0.0, 0.0
+        return 0.0, 0.0, 0, 0, False, False
 
 # ==========================================
 # 3. 계정 권한 제어 & 대상 선택 드롭다운
@@ -176,15 +200,34 @@ st.markdown(
 )
 
 # ==========================================
-# 4. 년/월 선택 및 컨트롤 툴바
+# 4. ◀️ 이전달 / 다음달 ▶️ 컨트롤 툴바
 # ==========================================
 st.markdown("---")
-c_y, c_m, c_act1, c_act2, c_act3 = st.columns([1, 1, 2, 2, 2])
+c_prev, c_y, c_m, c_next, c_act1, c_act2, c_act3 = st.columns([0.8, 1, 1, 0.8, 2, 2, 2])
+
+with c_prev:
+    if st.button("◀ 이전달", use_container_width=True):
+        if st.session_state.tc_month == 1:
+            st.session_state.tc_month = 12
+            st.session_state.tc_year -= 1
+        else:
+            st.session_state.tc_month -= 1
+        st.rerun()
 
 with c_y:
-    st.session_state.tc_year = st.number_input("연도", value=st.session_state.tc_year, step=1)
+    st.session_state.tc_year = st.number_input("연도", value=st.session_state.tc_year, step=1, label_visibility="collapsed")
+
 with c_m:
-    st.session_state.tc_month = st.number_input("월", value=st.session_state.tc_month, min_value=1, max_value=12, step=1)
+    st.session_state.tc_month = st.number_input("월", value=st.session_state.tc_month, min_value=1, max_value=12, step=1, label_visibility="collapsed")
+
+with c_next:
+    if st.button("다음달 ▶", use_container_width=True):
+        if st.session_state.tc_month == 12:
+            st.session_state.tc_month = 1
+            st.session_state.tc_year += 1
+        else:
+            st.session_state.tc_month += 1
+        st.rerun()
 
 year = st.session_state.tc_year
 month = st.session_state.tc_month
@@ -217,21 +260,20 @@ with c_act1:
                     elif "반차" in q_type:
                         st.session_state.user_vacation_info[target_user]["used"] += 0.5
 
-                    calc_w, calc_o = calculate_work_and_overtime(q_in, q_out, q_break)
+                    calc_w, calc_o, l_m, e_m, is_l, is_e = calculate_attendance_details(q_in, q_out, q_break)
 
                     att = next((a for a in st.session_state.attendance_logs if a["date"] == d_str and a.get("user_name") == target_user), None)
-                    
-                    is_late = ("지각" in q_type)
-                    is_early = ("조퇴" in q_type)
                     
                     if att:
                         att["clock_in"] = q_in
                         att["clock_out"] = q_out
                         att["work_hours"] = calc_w
-                        att["overtime"] = calc_o
-                        att["break_time"] = q_break
-                        att["late"] = is_late
-                        att["early_leave"] = is_early
+                        att["overtime_hours"] = calc_o
+                        att["break_hours"] = q_break
+                        att["late_minutes"] = l_m
+                        att["early_leave_minutes"] = e_m
+                        att["late"] = is_l
+                        att["early_leave"] = is_e
                         att["status"] = q_type
                         att["note"] = q_note
                     else:
@@ -241,10 +283,12 @@ with c_act1:
                             "clock_in": q_in,
                             "clock_out": q_out,
                             "work_hours": calc_w,
-                            "overtime": calc_o,
-                            "break_time": q_break,
-                            "late": is_late,
-                            "early_leave": is_early,
+                            "overtime_hours": calc_o,
+                            "break_hours": q_break,
+                            "late_minutes": l_m,
+                            "early_leave_minutes": e_m,
+                            "late": is_l,
+                            "early_leave": is_e,
                             "status": q_type,
                             "note": q_note
                         })
@@ -330,7 +374,7 @@ with c_act3:
                     "start_time": req_st,
                     "end_time": req_et,
                     "reason": req_r,
-                    "status": "승인대기",
+                    "status": "대기중",
                     "deducted": False
                 })
                 st.success("근태/휴가 신청이 완료되었습니다.")
@@ -350,9 +394,9 @@ user_logs_month = [
 
 total_work_days = len([a for a in user_logs_month if a.get("clock_in") and a.get("clock_in") != "-"])
 total_work_hours = sum([a.get("work_hours", 0.0) for a in user_logs_month])
-total_overtime_hours = sum([a.get("overtime", 0.0) for a in user_logs_month])
-total_late_count = len([a for a in user_logs_month if a.get("late")])
-total_early_count = len([a for a in user_logs_month if a.get("early_leave")])
+total_overtime_hours = sum([a.get("overtime_hours", 0.0) for a in user_logs_month])
+total_late_count = len([a for a in user_logs_month if a.get("late") or a.get("late_minutes", 0) > 0])
+total_early_count = len([a for a in user_logs_month if a.get("early_leave") or a.get("early_leave_minutes", 0) > 0])
 
 st.markdown("##### 📊 월간 근태 통계 요약")
 m1, m2, m3, m4, m5 = st.columns(5)
@@ -363,23 +407,26 @@ m4.metric("지각 횟수", f"{total_late_count} 회")
 m5.metric("조퇴 횟수", f"{total_early_count} 회")
 
 # ==========================================
-# 6. 📅 캘린더 뷰 (월간 / 주간 / 카테고리 필터)
+# 6. 📅 캘린더 뷰 (2종 완전 분리 선택)
 # ==========================================
 st.markdown("---")
-st.subheader(f"📅 {year}년 {month}월 근태 및 일정 캘린더 ({target_user} 님)")
+st.subheader(f"📅 {year}년 {month}월 캘린더")
 
-cat_filter = st.multiselect("📌 사내 공유 일정 카테고리 필터", ["외부미팅", "회의실사용", "업무일정", "기타"], default=["외부미팅", "회의실사용", "업무일정", "기타"])
+cal_mode = st.selectbox(
+    "🔄 캘린더 모드 선택 (원하시는 캘린더 화면을 선택하세요)",
+    ["1️⃣ 근무 / 근태 확인 캘린더 (출퇴근·근무시간·지각/조퇴)", "2️⃣ 사내 일정 확인 캘린더 (미팅·회의실·업무스케줄)"]
+)
 
-cal_tab1, cal_tab2 = st.tabs(["📆 월간 캘린더 뷰", "📋 주간/일별 요약 리스트"])
+first_weekday, _ = calendar.monthrange(year, month)
 
-with cal_tab1:
+# 1️⃣ 근무/근태 확인 캘린더
+if "1️⃣" in cal_mode:
+    st.info(f"💡 **[{target_user}]** 님의 출퇴근 시간, 근무시간, 잔업시간 및 지각/조퇴(분) 현황을 확인합니다.")
     cols = st.columns(7)
     for idx, day_name in enumerate(weekdays_kr):
         cols[idx].markdown(f"**<center>{day_name}</center>**", unsafe_allow_html=True)
 
-    first_weekday, _ = calendar.monthrange(year, month)
     day_counter = 1
-    
     for week in range(6):
         if day_counter > last_day:
             break
@@ -388,58 +435,61 @@ with cal_tab1:
             if (week == 0 and idx < first_weekday) or day_counter > last_day:
                 grid_cols[idx].write(" ")
             else:
-                curr_date_str = f"{year}-{month:02d}-{day_counter:02d}"
-                
-                att_day = next((a for a in st.session_state.attendance_logs if a["date"] == curr_date_str and a.get("user_name") == target_user), None)
-                schedules_day = [s for s in st.session_state.company_schedules if s["date"] == curr_date_str and s.get("category", "기타") in cat_filter]
+                curr_d_str = f"{year}-{month:02d}-{day_counter:02d}"
+                att_day = next((a for a in st.session_state.attendance_logs if a["date"] == curr_d_str and a.get("user_name") == target_user), None)
 
                 box_content = f"**{day_counter}일**\n\n"
-                
                 if att_day:
-                    st_str = att_day.get("status", "근무")
-                    c_in = att_day.get("clock_in", "-")
-                    c_out = att_day.get("clock_out", "-")
-                    box_content += f"⏰ `{c_in}~{c_out}`\n"
-                    box_content += f"🏷️ `{st_str}`\n"
-                    if att_day.get("late"):
-                        box_content += "⚠️ `지각` "
-                    if att_day.get("early_leave"):
-                        box_content += "⚠️ `조퇴` "
+                    box_content += f"⏰ `{att_day.get('clock_in','-')}~{att_day.get('clock_out','-')}`\n"
+                    box_content += f"⏱️ 근무: `{att_day.get('work_hours', 0.0)}h` (잔업 `{att_day.get('overtime_hours', 0.0)}h`)\n"
+                    
+                    if att_day.get("late_minutes", 0) > 0:
+                        box_content += f"⚠️ `지각 {att_day.get('late_minutes')}분` "
+                    if att_day.get("early_leave_minutes", 0) > 0:
+                        box_content += f"⚠️ `조퇴 {att_day.get('early_leave_minutes')}분` "
+                    if att_day.get("status") and att_day.get("status") != "정상근무":
+                        box_content += f"\n🏷️ `{att_day.get('status')}`"
                     box_content += "\n"
-
-                for sch in schedules_day:
-                    box_content += f"📌 [{sch.get('category', '일정')}] {sch['title']} ({sch['time']})\n"
+                else:
+                    box_content += "─\n"
 
                 grid_cols[idx].info(box_content)
                 day_counter += 1
 
-with cal_tab2:
-    st.caption("해당 월의 전체 근태 및 사내공유 일정을 일자별 리스트로 확인합니다.")
-    all_events = []
-    for d in range(1, last_day + 1):
-        curr_d_str = f"{year}-{month:02d}-{d:02d}"
-        att_day = next((a for a in st.session_state.attendance_logs if a["date"] == curr_d_str and a.get("user_name") == target_user), None)
-        sch_day = [s for s in st.session_state.company_schedules if s["date"] == curr_d_str and s.get("category", "기타") in cat_filter]
+# 2️⃣ 사내 일정 확인 캘린더
+else:
+    cat_filter = st.multiselect("📌 일정 카테고리 필터", ["외부미팅", "회의실사용", "업무일정", "기타"], default=["외부미팅", "회의실사용", "업무일정", "기타"])
+    cols = st.columns(7)
+    for idx, day_name in enumerate(weekdays_kr):
+        cols[idx].markdown(f"**<center>{day_name}</center>**", unsafe_allow_html=True)
 
-        if att_day or sch_day:
-            info_str = ""
-            if att_day:
-                info_str += f"[근태] {att_day.get('clock_in')}~{att_day.get('clock_out')} ({att_day.get('status')}) "
-            if sch_day:
-                info_str += " / ".join([f"[{s.get('category')}] {s['title']}" for s in sch_day])
-            
-            all_events.append({"날짜": curr_d_str, "내용": info_str})
-    
-    if all_events:
-        st.table(pd.DataFrame(all_events))
-    else:
-        st.write("등록된 내역이 없습니다.")
+    day_counter = 1
+    for week in range(6):
+        if day_counter > last_day:
+            break
+        grid_cols = st.columns(7)
+        for idx in range(7):
+            if (week == 0 and idx < first_weekday) or day_counter > last_day:
+                grid_cols[idx].write(" ")
+            else:
+                curr_d_str = f"{year}-{month:02d}-{day_counter:02d}"
+                sch_day = [s for s in st.session_state.company_schedules if s["date"] == curr_d_str and s.get("category", "기타") in cat_filter]
+
+                box_content = f"**{day_counter}일**\n\n"
+                if sch_day:
+                    for sch in sch_day:
+                        box_content += f"📌 [{sch.get('category')}] {sch['title']} ({sch['time']})\n"
+                else:
+                    box_content += "─\n"
+
+                grid_cols[idx].success(box_content)
+                day_counter += 1
 
 # ==========================================
-# 7. 📋 상세 타임카드 테이블 (전체 항목 및 다운로드)
+# 7. 📋 상세 타임카드 테이블 & 직관적 수정 모듈
 # ==========================================
 st.markdown("---")
-st.subheader(f"📋 [{target_user}] 님 상세 타임카드 (근무시간 · 잔업 · 지각/조퇴 · 휴식)")
+st.subheader(f"📋 [{target_user}] 님 상세 타임카드 (근무·잔업·지각/조퇴 분단위 세부 내역)")
 
 daily_data = []
 for d in range(1, last_day + 1):
@@ -452,94 +502,102 @@ for d in range(1, last_day + 1):
     daily_data.append({
         "raw_date": date_str,
         "날짜": date_disp,
-        "출근시간": att["clock_in"] if att else "-",
-        "퇴근시간": att["clock_out"] if att else "-",
-        "근무시간": att.get("work_hours", 0.0) if att else 0.0,
-        "잔업시간": att.get("overtime", 0.0) if att else 0.0,
-        "휴식시간": att.get("break_time", 1.0) if att else 1.0,
-        "지각여부": att.get("late", False) if att else False,
-        "조퇴여부": att.get("early_leave", False) if att else False,
-        "상태": att.get("status", "정상") if att else "미기록",
+        "출근시간": att.get("clock_in", "-") if att else "-",
+        "퇴근시간": att.get("clock_out", "-") if att else "-",
+        "근무시간(h)": att.get("work_hours", 0.0) if att else 0.0,
+        "잔업시간(h)": att.get("overtime_hours", 0.0) if att else 0.0,
+        "지각(분)": att.get("late_minutes", 0) if att else 0,
+        "조퇴(분)": att.get("early_leave_minutes", 0) if att else 0,
+        "휴식시간(h)": att.get("break_hours", 1.0) if att else 1.0,
+        "상태": att.get("status", "미기록") if att else "미기록",
         "비고/사유": att.get("note", "") if att else ""
     })
 
 df_tc = pd.DataFrame(daily_data)
 
+st.dataframe(
+    df_tc[["날짜", "출근시간", "퇴근시간", "근무시간(h)", "잔업시간(h)", "지각(분)", "조퇴(분)", "휴식시간(h)", "상태", "비고/사유"]],
+    use_container_width=True,
+    height=360
+)
+
+# [관리자 전용] 직관적 시스템 관리 스타일 수정 모듈
 if is_admin:
-    st.caption("💡 **[관리자 기능]** 아래 표에서 출/퇴근시간, 근무/잔업/휴식 시간 및 지각/조퇴 여부를 직접 수정 후 **[💾 저장]**을 누르세요.")
-    
-    edited_tc = st.data_editor(
-        df_tc[["날짜", "출근시간", "퇴근시간", "근무시간", "잔업시간", "휴식시간", "지각여부", "조퇴여부", "상태", "비고/사유"]],
-        use_container_width=True,
-        height=380,
-        key=f"editor_tc_{target_user}_{year}_{month}"
-    )
+    st.markdown("##### 🛠️ [관리자] 직관적 1:1 타임카드 수정 및 자동 계산")
+    st.caption("시스템 관리 페이지처럼 수정할 일자를 선택한 후 출/퇴근 시간을 변경하면 근무/잔업시간 및 지각/조퇴(분)가 실시간 자동 계산되어 원본에 저장됩니다.")
 
-    col_s1, col_s2 = st.columns([2, 1])
-    with col_s1:
-        if st.button(f"💾 [{target_user}] 타임카드 수정사항 원본 저장", type="primary", use_container_width=True):
-            for idx, row in edited_tc.iterrows():
-                raw_d = df_tc.loc[idx, "raw_date"]
-                att = next((a for a in st.session_state.attendance_logs if a["date"] == raw_d and a.get("user_name") == target_user), None)
-                
-                # 시간 자동 계산 적용
-                calc_w, calc_o = calculate_work_and_overtime(str(row["출근시간"]), str(row["퇴근시간"]), float(row["휴식시간"]))
+    with st.form("admin_simple_edit_form"):
+        col_e1, col_e2, col_e3, col_e4 = st.columns(4)
+        with col_e1:
+            sel_edit_date = st.date_input("수정할 날짜 선택", datetime.date(year, month, 1))
+        
+        target_d_str = str(sel_edit_date)
+        cur_att = next((a for a in st.session_state.attendance_logs if a["date"] == target_d_str and a.get("user_name") == target_user), {})
 
-                if att:
-                    att["clock_in"] = str(row["출근시간"]).strip()
-                    att["clock_out"] = str(row["퇴근시간"]).strip()
-                    att["work_hours"] = calc_w if (calc_w > 0 or str(row["출근시간"]) != "-") else float(row["근무시간"])
-                    att["overtime"] = calc_o if (calc_o > 0 or str(row["출근시간"]) != "-") else float(row["잔업시간"])
-                    att["break_time"] = float(row["휴식시간"])
-                    att["late"] = bool(row["지각여부"])
-                    att["early_leave"] = bool(row["조퇴여부"])
-                    att["status"] = str(row["상태"]).strip()
-                    att["note"] = str(row["비고/사유"]).strip()
-                else:
-                    if str(row["출근시간"]) != "-" or str(row["비고/사유"]) != "":
-                        st.session_state.attendance_logs.append({
-                            "user_name": target_user,
-                            "date": raw_d,
-                            "clock_in": str(row["출근시간"]).strip(),
-                            "clock_out": str(row["퇴근시간"]).strip(),
-                            "work_hours": calc_w if calc_w > 0 else float(row["근무시간"]),
-                            "overtime": calc_o if calc_o > 0 else float(row["잔업시간"]),
-                            "break_time": float(row["휴식시간"]),
-                            "late": bool(row["지각여부"]),
-                            "early_leave": bool(row["조퇴여부"]),
-                            "status": str(row["상태"]).strip(),
-                            "note": str(row["비고/사유"]).strip()
-                        })
-            st.success(f"[{target_user}] 님의 타임카드 데이터가 성공적으로 반영되었습니다!")
+        with col_e2:
+            edit_in = st.text_input("출근시간 (HH:MM)", value=cur_att.get("clock_in", "09:00"))
+        with col_e3:
+            edit_out = st.text_input("퇴근시간 (HH:MM)", value=cur_att.get("clock_out", "18:00"))
+        with col_e4:
+            edit_break = st.number_input("휴식시간 (시간)", value=cur_att.get("break_hours", 1.0), step=0.5)
+
+        col_e5, col_e6, col_e7 = st.columns([2, 2, 2])
+        with col_e5:
+            edit_status = st.selectbox("근태 상태", ["정상근무", "지각", "조퇴", "연장근무", "연차/휴가", "반차", "결근"], index=0)
+        with col_e6:
+            edit_note = st.text_input("비고/사유", value=cur_att.get("note", ""))
+        with col_e7:
+            st.write(" ")
+            st.write(" ")
+            submit_edit = st.form_submit_button("💾 타임카드 수정 저장", type="primary", use_container_width=True)
+
+        if submit_edit:
+            w_hrs, o_hrs, l_mins, e_mins, is_l, is_e = calculate_attendance_details(edit_in, edit_out, edit_break)
+            
+            att_item = next((a for a in st.session_state.attendance_logs if a["date"] == target_d_str and a.get("user_name") == target_user), None)
+            
+            if att_item:
+                att_item["clock_in"] = edit_in
+                att_item["clock_out"] = edit_out
+                att_item["work_hours"] = w_hrs
+                att_item["overtime_hours"] = o_hrs
+                att_item["late_minutes"] = l_mins
+                att_item["early_leave_minutes"] = e_mins
+                att_item["late"] = is_l
+                att_item["early_leave"] = is_e
+                att_item["break_hours"] = edit_break
+                att_item["status"] = edit_status
+                att_item["note"] = edit_note
+            else:
+                st.session_state.attendance_logs.append({
+                    "user_name": target_user,
+                    "date": target_d_str,
+                    "clock_in": edit_in,
+                    "clock_out": edit_out,
+                    "work_hours": w_hrs,
+                    "overtime_hours": o_hrs,
+                    "late_minutes": l_mins,
+                    "early_leave_minutes": e_mins,
+                    "late": is_l,
+                    "early_leave": is_e,
+                    "break_hours": edit_break,
+                    "status": edit_status,
+                    "note": edit_note
+                })
+            st.success(f"[{target_user}] 님의 {target_d_str} 타임카드가 정밀 수정되었습니다! (지각: {l_mins}분 / 조퇴: {e_mins}분 / 근무: {w_hrs}h 자동계산 반영 완료)")
             st.rerun()
 
-    with col_s2:
-        # CSV 다운로드 기능
-        csv_data = df_tc[["날짜", "출근시간", "퇴근시간", "근무시간", "잔업시간", "휴식시간", "지각여부", "조퇴여부", "상태", "비고/사유"]].to_csv(index=False).encode('utf-8-sig')
-        st.download_button(
-            label="📥 타임카드 CSV 다운로드",
-            data=csv_data,
-            file_name=f"{target_user}_타임카드_{year}_{month}.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-else:
-    st.info("💡 일반 직원은 본인의 타임카드 내역을 확인할 수 있습니다.")
-    st.dataframe(
-        df_tc[["날짜", "출근시간", "퇴근시간", "근무시간", "잔업시간", "휴식시간", "지각여부", "조퇴여부", "상태", "비고/사유"]],
-        use_container_width=True
-    )
-    
-    csv_data = df_tc[["날짜", "출근시간", "퇴근시간", "근무시간", "잔업시간", "휴식시간", "지각여부", "조퇴여부", "상태", "비고/사유"]].to_csv(index=False).encode('utf-8-sig')
-    st.download_button(
-        label="📥 내 타임카드 CSV 다운로드",
-        data=csv_data,
-        file_name=f"{target_user}_타임카드_{year}_{month}.csv",
-        mime="text/csv"
-    )
+# CSV 내보내기 버튼
+csv_data = df_tc[["날짜", "출근시간", "퇴근시간", "근무시간(h)", "잔업시간(h)", "지각(분)", "조퇴(분)", "휴식시간(h)", "상태", "비고/사유"]].to_csv(index=False).encode('utf-8-sig')
+st.download_button(
+    label="📥 타임카드 CSV 내보내기",
+    data=csv_data,
+    file_name=f"{target_user}_타임카드_{year}_{month}.csv",
+    mime="text/csv"
+)
 
 # ==========================================
-# 8. 📑 휴가/근태 신청 및 관리자 승인 이력 테이블
+# 8. 📑 휴가/근태 신청 이력 및 결재 관리자 승인
 # ==========================================
 st.markdown("---")
 st.subheader(f"📑 [{target_user}] 님 휴가/근태 신청 이력 및 결재 현황")
@@ -549,8 +607,8 @@ user_reqs = [r for r in st.session_state.schedule_requests if r.get("user_name")
 if user_reqs:
     df_reqs = pd.DataFrame(user_reqs)
     st.dataframe(
-        df_reqs[["date", "type", "start_time", "end_time", "reason", "status"]].rename(columns={
-            "date": "신청일자", "type": "구분", "start_time": "시작시간", "end_time": "종료시간", "reason": "사유", "status": "승인상태"
+        df_reqs[["date", "type", "reason", "status"]].rename(columns={
+            "date": "신청일자", "type": "구분", "reason": "사유", "status": "승인상태"
         }),
         use_container_width=True
     )
