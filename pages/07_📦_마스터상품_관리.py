@@ -1,33 +1,79 @@
 import streamlit as st
 
-st.set_page_config(page_title="마스터상품 및 집기관리", layout="wide")
+st.set_page_config(page_title="마스터상품 관리", layout="wide")
 
 import pandas as pd
 from sidebar_menu import render_sidebar
 
 render_sidebar()
 
-user = st.session_state.get("logged_in_user")
-
 st.title("📦 마스터 상품 및 집기 자산 관리")
 st.markdown("---")
 
+lang = st.session_state.get("lang", "한국어")
+
+# 다국어 컬럼 맵핑
+COLUMN_MAPS = {
+    "한국어": {
+        "jan_code": "JAN 코드 (바코드)",
+        "product_name": "상품명",
+        "category": "카테고리",
+        "capacity": "용량/규격",
+        "units_per_box": "박스당 입수량(EA)",
+        "box_cbm": "박스 CBM",
+        "box_weight_kg": "박스 중량(kg)",
+        "plt_qty": "PLT당 박스 수",
+        "supply_price_jpy": "공급 단가(엔)",
+        "list_price_jpy": "소비자 가(엔)",
+        "memo": "비고/메모"
+    },
+    "日本語": {
+        "jan_code": "JANコード",
+        "product_name": "商品名",
+        "category": "カテゴリー",
+        "capacity": "容量/規格",
+        "units_per_box": "1箱の入数(EA)",
+        "box_cbm": "箱 CBM",
+        "box_weight_kg": "箱 重量(kg)",
+        "plt_qty": "PLT当り箱数",
+        "supply_price_jpy": "供給単価(円)",
+        "list_price_jpy": "上代(円)",
+        "memo": "備考/メモ"
+    },
+    "English": {
+        "jan_code": "JAN Code",
+        "product_name": "Product Name",
+        "category": "Category",
+        "capacity": "Capacity",
+        "units_per_box": "Units Per Box",
+        "box_cbm": "Box CBM",
+        "box_weight_kg": "Box Weight(kg)",
+        "plt_qty": "Boxes Per PLT",
+        "supply_price_jpy": "Supply Price (JPY)",
+        "list_price_jpy": "List Price (JPY)",
+        "memo": "Memo"
+    }
+}
+
 tab1, tab2, tab3 = st.tabs(["🛒 상품 마스터 관리", "➕ 신규 상품 등록", "🎪 집기 마스터 & 자산 관리"])
 
-# --- TAB 1: 상품 마스터 ---
 with tab1:
     st.subheader("등록된 마스터 상품 목록")
     if st.session_state.master_products:
         df_p = pd.DataFrame(st.session_state.master_products)
-        edited_df = st.data_editor(df_p, num_rows="dynamic", use_container_width=True)
+        # 선택된 언어에 따른 컬럼명 변경
+        df_p_renamed = df_p.rename(columns=COLUMN_MAPS.get(lang, COLUMN_MAPS["한국어"]))
+        edited_df = st.data_editor(df_p_renamed, num_rows="dynamic", use_container_width=True)
+        
         if st.button("💾 상품 변경사항 저장"):
-            st.session_state.master_products = edited_df.to_dict("records")
-            st.success("상품 마스터가 अपडेट 되었습니다.")
+            # 원래 파이썬 세션 키값으로 다시 복원하여 저장
+            inv_map = {v: k for k, v in COLUMN_MAPS.get(lang, COLUMN_MAPS["한국어"]).items()}
+            st.session_state.master_products = edited_df.rename(columns=inv_map).to_dict("records")
+            st.success("상품 마스터가 성공적으로 저장되었습니다.")
             st.rerun()
     else:
         st.info("등록된 상품이 없습니다.")
 
-# --- TAB 2: 신규 상품 등록 ---
 with tab2:
     st.subheader("신규 상품 입력")
     with st.form("add_product_form"):
@@ -67,25 +113,21 @@ with tab2:
                 st.success("신규 상품이 등록되었습니다.")
                 st.rerun()
 
-# --- TAB 3: 집기 마스터 & 자산 관리 (신규 반영) ---
 with tab3:
-    st.subheader("🎪 집기(POP/매대/디스플레이) 마스터 등록 및 남은 자산 관리")
-    st.caption("집기명, 총 제작수량, 입고창고명, 총 제작비를 입력하시면 개당 단가 및 남아있는 집기의 자산 금액이 자동 산출됩니다.")
-
+    st.subheader("🎪 집기 마스터 & 자산 관리")
     with st.form("fix_form"):
         fc1, fc2 = st.columns(2)
         with fc1:
-            f_name = st.text_input("집기명 (예: 아크릴 매대 A타입)")
+            f_name = st.text_input("집기명")
             f_total_qty = st.number_input("제작/입고 수량(개)", min_value=1, value=100)
             f_wh = st.selectbox("입고 창고명", st.session_state.warehouses)
         with fc2:
             f_cost = st.number_input("총 제작비(엔)", min_value=0, value=500000)
             f_rem_qty = st.number_input("현재 잔여 수량(개)", min_value=0, value=100)
 
-        if st.form_submit_button("🎪 집기 등록 및 자산 반영"):
+        if st.form_submit_button("🎪 집기 등록"):
             unit_c = round(f_cost / f_total_qty, 2) if f_total_qty > 0 else 0
             rem_val = round(unit_c * f_rem_qty, 2)
-
             st.session_state.master_fixtures.append({
                 "fixture_name": f_name,
                 "total_qty": f_total_qty,
@@ -98,11 +140,6 @@ with tab3:
             st.success("집기가 등록되었습니다.")
             st.rerun()
 
-    st.markdown("---")
-    st.subheader("📋 집기 보유 및 잔여 자산 현황표")
     if st.session_state.master_fixtures:
         df_fix = pd.DataFrame(st.session_state.master_fixtures)
-        df_fix.columns = ["집기명", "총 제작수량", "잔여 수량", "입고창고명", "총 제작비(엔)", "1개당 단가(엔)", "총 잔여 자산가치(엔)"]
         st.dataframe(df_fix, use_container_width=True)
-    else:
-        st.info("등록된 집기 데이터가 없습니다.")
