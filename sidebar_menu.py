@@ -1,45 +1,44 @@
 import streamlit as st
-from i18n import txt, render_live_clock
+from i18n import render_language_selector, txt
+
 
 def render_sidebar():
-    """공통 사이드바 Rendering"""
-    if not st.session_state.get("logged_in_user"):
-        st.warning(txt("login_required"))
-        if st.button(txt("go_to_login"), type="primary", use_container_width=True):
-            st.switch_page("01_ERP_Main.py")
-        st.stop()
+    """공통 사이드바 메뉴 및 언어 선택기 렌더링"""
+    with st.sidebar:
+        # 1. 🌐 다국어 언어 선택 셀렉트박스 (최상단 배치)
+        render_language_selector(container=st.sidebar)
+        st.markdown("---")
 
-    user = st.session_state.logged_in_user
+        # 2. 로그인 사용자 정보 표시
+        user = st.session_state.get("logged_in_user")
+        if user:
+            st.markdown(
+                f"👤 **{user.get('name', '')}** ({user.get('position', txt('default_position', '사원'))})"
+            )
+            st.caption(
+                f"🔑 {txt('label_role', '권한')}: {user.get('role', txt('default_role', '일반 사용자'))}"
+            )
+            st.markdown("---")
 
-    # 언어 선택기
-    st.sidebar.subheader(txt("lang_select"))
-    current_lang = st.session_state.get("lang", user.get("lang", "한국어"))
-    selected_lang = st.sidebar.selectbox(
-        "언어 선택",
-        ["한국어", "日本語", "English"],
-        index=["한국어", "日本語", "English"].index(current_lang) if current_lang in ["한국어", "日本語", "English"] else 0,
-        label_visibility="collapsed"
-    )
-    if selected_lang != current_lang:
-        st.session_state.lang = selected_lang
-        # 유저 선호 언어도 세션 내 동기화
-        if st.session_state.logged_in_user:
-            st.session_state.logged_in_user["lang"] = selected_lang
-        st.rerun()
+        # 3. 메인 메뉴 네비게이션
+        st.page_link(
+            "pages/01_⏱️_출퇴근시스템.py",
+            label=txt("menu_commute", "⏱️ 출퇴근 관리 / 타임카드"),
+        )
+        st.page_link(
+            "pages/02_⚙️_시스템관리.py",
+            label=txt("menu_system", "⚙️ 시스템 및 사용자 관리"),
+        )
+        st.page_link(
+            "pages/03_👤_마이페이지.py",
+            label=txt("menu_mypage", "👤 마이페이지"),
+        )
 
-    st.sidebar.markdown("---")
+        st.markdown("---")
 
-    # 사용자 정보 및 로그아웃
-    st.sidebar.markdown(f"{txt('logged_in_as')}: **{user['name']}** ({user.get('position', '사원')})")
-    
-    st.sidebar.markdown(f"**{txt('live_clock')}**")
-    render_live_clock()
-
-    if st.sidebar.button(txt("logout"), use_container_width=True):
-        st.session_state.logged_in_user = None
-        st.switch_page("01_ERP_Main.py")
-
-# sidebar_menu.py 내부 적절한 위치 (예: render_sidebar 함수 내부)
-from i18n import render_language_selector
-
-render_language_selector()  # 사이드바 상단/하단에 언어 선택 드롭다운 자동 표시
+        # 4. 로그아웃 버튼
+        if user and st.button(
+            txt("btn_logout", "🚪 로그아웃"), use_container_width=True
+        ):
+            st.session_state["logged_in_user"] = None
+            st.rerun()
