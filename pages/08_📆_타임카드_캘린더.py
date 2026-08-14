@@ -43,13 +43,50 @@ is_admin = (logged_user.get("role") == "admin")
 if "selected_target_user" not in st.session_state:
     st.session_state.selected_target_user = logged_user["name"]
 
-# 연차 데이터 (기본 부여 연차 마스터)
-if "user_vacation_info" not in st.session_state:
-    st.session_state.user_vacation_info = {
-        "관리자": {"granted": 15.0},
-        "김사원": {"granted": 15.0},
-        "이대리": {"granted": 15.0},
-    }
+# =============================================================================
+# 🌴 [수정] 시스템 관리(st.session_state.users) 동적 연동 연차 마스터
+# =============================================================================
+
+def update_user_vacation_info():
+    """시스템관리 사용자 목록에서 연차 정보를 읽어와 동적으로 생성"""
+    vacation_dict = {}
+    users_list = st.session_state.get("users", [])
+    
+    for u in users_list:
+        # 사용자 이름 (이름이 없으면 ID 사용)
+        user_key = u.get("name") or u.get("id")
+        if not user_key:
+            continue
+        
+        # 시스템관리에서 설정된 연차 값 가져오기
+        # 'remaining_leave', 'granted_leave', 'annual_leave' 항목 지원 (기본값: 15.0)
+        raw_val = u.get("remaining_leave")
+        if raw_val is None:
+            raw_val = u.get("granted_leave", u.get("annual_leave", 15.0))
+        
+        try:
+            granted_days = float(raw_val)
+        except (ValueError, TypeError):
+            granted_days = 15.0
+            
+        vacation_dict[user_key] = {
+            "granted": granted_days,
+            "id": u.get("id", ""),
+            "position": u.get("position", "사원")
+        }
+    
+    return vacation_dict
+
+# 타임카드 로딩 시마다 시스템관리의 최신 유저 및 연차 정보로 동기화
+st.session_state.user_vacation_info = update_user_vacation_info()
+
+# 현재 로그인한 사용자의 부여 연차 수치 (시스템관리에 없으면 15.0 적용)
+current_user_name = user.get("name") if user else ""
+current_user_info = st.session_state.user_vacation_info.get(
+    current_user_name, 
+    {"granted": float(user.get("remaining_leave", 15.0) if user else 15.0)}
+)
+# =============================================================================
 
 # 근태 원본 데이터
 if "attendance_logs" not in st.session_state:
