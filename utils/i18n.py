@@ -3,7 +3,7 @@ import pytz
 import streamlit as st
 
 # -----------------------------------------------------------------------------
-# 1. 다국어 번역 사전
+# 1. 전역 번역 사전
 # -----------------------------------------------------------------------------
 TRANSLATIONS = {
     "KO": {
@@ -13,6 +13,14 @@ TRANSLATIONS = {
         "commute_out": "퇴근하기",
         "already_in": "이미 출근 처리되었습니다.",
         "already_out": "이미 퇴근 처리되었습니다.",
+        "select_language": "🌐 언어 선택 (Language)",
+        "menu_commute": "⏱️ 출퇴근 관리 / 타임카드",
+        "menu_system": "⚙️ 시스템 및 사용자 관리",
+        "menu_mypage": "👤 마이페이지",
+        "default_position": "사원",
+        "default_role": "일반 사용자",
+        "label_role": "권한",
+        "btn_logout": "🚪 로그아웃",
     },
     "JA": {
         "clock_title": "現在時刻",
@@ -21,6 +29,14 @@ TRANSLATIONS = {
         "commute_out": "退勤",
         "already_in": "出勤処理が完了しています。",
         "already_out": "退勤処理が完了しています。",
+        "select_language": "🌐 言語選択 (Language)",
+        "menu_commute": "⏱️ 勤怠管理 / タイムカード",
+        "menu_system": "⚙️ システムおよびユーザー管理",
+        "menu_mypage": "👤 マイページ",
+        "default_position": "社員",
+        "default_role": "一般ユーザー",
+        "label_role": "権限",
+        "btn_logout": "🚪 ログアウト",
     },
     "EN": {
         "clock_title": "Current Time",
@@ -29,59 +45,64 @@ TRANSLATIONS = {
         "commute_out": "Clock Out",
         "already_in": "Already clocked in.",
         "already_out": "Already clocked out.",
+        "select_language": "🌐 Select Language",
+        "menu_commute": "⏱️ Attendance / Timecard",
+        "menu_system": "⚙️ System & User Management",
+        "menu_mypage": "👤 My Page",
+        "default_position": "Staff",
+        "default_role": "General User",
+        "label_role": "Role",
+        "btn_logout": "🚪 Logout",
     },
 }
 
+LANG_MAP_TO_CODE = {
+    "한국어": "KO",
+    "KO": "KO",
+    "日本語": "JA",
+    "JA": "JA",
+    "English": "EN",
+    "EN": "EN",
+}
 
-# -----------------------------------------------------------------------------
-# 2. 현재 사용자/세션 언어 감지 함수
-# -----------------------------------------------------------------------------
+LANG_MAP_TO_NAME = {"KO": "한국어", "JA": "日本語", "EN": "English"}
+
+
 def get_language():
-    """로그인 사용자 선호 언어 또는 세션 글로벌 언어 감지"""
-    user = st.session_state.get("logged_in_user", {})
-    raw_lang = (
-        (user.get("language") if isinstance(user, dict) else None)
-        or st.session_state.get("lang")
-        or st.session_state.get("language")
-        or "KO"
-    )
+    """세션 및 유저 설정에서 현재 언어 감지"""
+    if "lang" in st.session_state and st.session_state["lang"]:
+        raw_lang = st.session_state["lang"]
+    elif "language" in st.session_state and st.session_state["language"]:
+        raw_lang = st.session_state["language"]
+    elif "logged_in_user" in st.session_state and isinstance(
+        st.session_state["logged_in_user"], dict
+    ):
+        raw_lang = st.session_state["logged_in_user"].get("language", "KO")
+    else:
+        raw_lang = "KO"
 
-    mapping = {
-        "한국어": "KO",
-        "KO": "KO",
-        "日本語": "JA",
-        "JA": "JA",
-        "English": "EN",
-        "EN": "EN",
-    }
-    return mapping.get(raw_lang, "KO")
+    return LANG_MAP_TO_CODE.get(str(raw_lang), "KO")
 
 
-# -----------------------------------------------------------------------------
-# 3. 번역 텍스트 반환 함수 (txt)
-# -----------------------------------------------------------------------------
 def txt(key: str, default_text: str = None) -> str:
-    """i18n 텍스트 반환 함수"""
+    """텍스트 번역 반환"""
     lang = get_language()
-
-    # 1) 세션 상태에 저장된 공통 번역 테이블이 있다면 우선 탐색
     custom_dict = st.session_state.get("translations", {})
-    if lang in custom_dict and key in custom_dict[lang]:
+    if (
+        isinstance(custom_dict, dict)
+        and lang in custom_dict
+        and key in custom_dict[lang]
+    ):
         return custom_dict[lang][key]
 
-    # 2) 기본 내장 사전 탐색
     if lang in TRANSLATIONS and key in TRANSLATIONS[lang]:
         return TRANSLATIONS[lang][key]
 
-    # 3) 없을 경우 전달받은 default_text 또는 키 이름 그대로 반환
     return default_text if default_text is not None else key
 
 
-# -----------------------------------------------------------------------------
-# 4. 실시간 시계 위젯 함수 (render_live_clock)
-# -----------------------------------------------------------------------------
 def render_live_clock(timezone_str: str = "Asia/Tokyo"):
-    """출퇴근 페이지용 시계 렌더링 함수"""
+    """실시간 시계 렌더링"""
     try:
         tz = pytz.timezone(timezone_str)
         now = datetime.now(tz)
