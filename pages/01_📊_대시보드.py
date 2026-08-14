@@ -139,9 +139,6 @@ else:
 
             show_tab1 = display_tab1_df[
                 [
-                    "date",
-                    "order_no",
-                    "client_name",
                     "jan_code",
                     "product_name",
                     "purpose",
@@ -149,21 +146,16 @@ else:
                     "unit_price_fmt",
                     "금액_표기",
                     "warehouse",
-                    "status",
                 ]
             ].rename(
                 columns={
-                    "date": "일자",
-                    "order_no": "발주코드",
-                    "client_name": "거래처명",
                     "jan_code": "JAN코드",
                     "product_name": "상품명",
                     "purpose": "용도",
                     "qty_fmt": "수량",
                     "unit_price_fmt": "단가",
-                    "금액_표기": "발주금액",
+                    "금액_표기": "매출금액",
                     "warehouse": "출고창고",
-                    "status": "상태",
                 }
             )
 
