@@ -37,7 +37,7 @@ else:
 
             # remaining_leave 컬럼 세팅
             if "remaining_leave" not in df_users.columns:
-                df_users["remaining_leave"] = 15.0
+                df_users["remaining_leave"] = 0.0
 
             edited_users = st.data_editor(
                 df_users,
