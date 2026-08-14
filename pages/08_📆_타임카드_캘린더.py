@@ -61,15 +61,15 @@ def update_user_vacation_info():
         if not user_key:
             continue
         
-        # 시스템관리에서 설정된 연차 값 가져오기 (기본값: 15.0)
+        # 시스템관리에서 설정된 연차 값 가져오기 (기본값: 0.0)
         raw_val = u.get("remaining_leave")
         if raw_val is None:
-            raw_val = u.get("granted_leave", u.get("annual_leave", 15.0))
+            raw_val = u.get("granted_leave", u.get("annual_leave", 0.0))
         
         try:
             granted_days = float(raw_val)
         except (ValueError, TypeError):
-            granted_days = 15.0
+            granted_days = 0.0
             
         vacation_dict[user_key] = {
             "granted": granted_days,
@@ -86,7 +86,7 @@ st.session_state.user_vacation_info = update_user_vacation_info()
 current_user_name = user.get("name") if (user and isinstance(user, dict)) else ""
 current_user_info = st.session_state.user_vacation_info.get(
     current_user_name, 
-    {"granted": float(user.get("remaining_leave", 15.0) if (user and isinstance(user, dict)) else 15.0)}
+    {"granted": float(user.get("remaining_leave", 0.0) if (user and isinstance(user, dict)) else 0.0)}
 )
 # =============================================================================
 
