@@ -1,6 +1,14 @@
-import pandas as pd
 import streamlit as st
 from sidebar_menu import render_sidebar
+from utils.i18n import txt
+
+# 1. 공통 사이드바 및 언어선택기 호출
+render_sidebar()
+
+# 2. 페이지 헤더
+st.title(txt("menu_system", "⚙️ 시스템 및 사용자 관리"))
+
+# ... (이하 기존 시스템관리 로직 코드)
 
 # -----------------------------------------------------------------------------
 # 1. 다국어 사전 정의 (한국어 / 日本語 / English)
