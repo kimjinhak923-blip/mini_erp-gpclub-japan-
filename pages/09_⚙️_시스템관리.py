@@ -11,32 +11,28 @@ user = st.session_state.get("logged_in_user")
 st.title("⚙️ 시스템 및 사용자 관리")
 st.markdown("---")
 
-# 세션 내 연차 신청 내역 초기화 (테스트용/기존데이터 없을 경우)
-if "vacation_requests" not in st.session_state:
-    st.session_state.vacation_requests = []
-
 if not user or "관리자" not in user.get("role", ""):
     st.error("관리자(CEO)만 접근할 수 있는 메뉴입니다.")
 else:
-    # 탭 구성: 사용자 관리 / 공통 코드
-    tab1, tab2  = st.tabs(
-        [
-            "👤 사용자 승인 및 권한 관리",
-            "🏢 공통 코드 관리",
-        ]
-    )
+    # 탭 구성: 1. 사용자 관리 / 2. 공통 코드 관리 (연차 승인 탭 제거됨)
+    tab1, tab2 = st.tabs(["👤 사용자 승인 및 권한 관리", "🏢 공통 코드 관리"])
 
     # -------------------------------------------------------------------------
-    # TAB 1: 사용자 승인 및 권한 (직원별 연차 수동 수정 가능)
+    # TAB 1: 사용자 승인 및 권한 관리 (연차 데이터 제거)
     # -------------------------------------------------------------------------
     with tab1:
-        st.subheader("전체 사용자 및 연차 관리")
+        st.subheader("전체 사용자 목록")
         if "users" in st.session_state and st.session_state.users:
             df_users = pd.DataFrame(st.session_state.users)
 
-            # remaining_leave 컬럼 세팅
-            if "remaining_leave" not in df_users.columns:
-                df_users["remaining_leave"] = 0.0
+            # 기존 연차 관련 컬럼이 있다면 표에서 표시되지 않도록 제거
+            for leave_col in [
+                "remaining_leave",
+                "granted_leave",
+                "annual_leave",
+            ]:
+                if leave_col in df_users.columns:
+                    df_users = df_users.drop(columns=[leave_col])
 
             edited_users = st.data_editor(
                 df_users,
@@ -48,7 +44,6 @@ else:
                     "role": st.column_config.TextColumn("권한"),
                     "department": st.column_config.TextColumn("부서"),
                     "position": st.column_config.TextColumn("직급"),
-                    ),
                 },
             )
 
@@ -62,11 +57,11 @@ else:
                         st.session_state.logged_in_user = u
                         break
 
-                st.success("사용자 정보 및 연차가 저장되었습니다.")
+                st.success("사용자 정보가 저장되었습니다.")
                 st.rerun()
 
     # -------------------------------------------------------------------------
-    # TAB 3: 공통 코드 관리 (창고/직급)
+    # TAB 2: 공통 코드 관리 (창고/직급)
     # -------------------------------------------------------------------------
     with tab2:
         st.subheader("창고 / 직급 목록 관리")
