@@ -47,6 +47,9 @@ if "selected_target_user" not in st.session_state:
 # 🌴 [수정] 시스템 관리(st.session_state.users) 동적 연동 연차 마스터
 # =============================================================================
 
+# 로그인된 사용자 정보를 세션에서 안전하게 취득 (NameError 방지)
+user = st.session_state.get("logged_in_user")
+
 def update_user_vacation_info():
     """시스템관리 사용자 목록에서 연차 정보를 읽어와 동적으로 생성"""
     vacation_dict = {}
@@ -58,8 +61,7 @@ def update_user_vacation_info():
         if not user_key:
             continue
         
-        # 시스템관리에서 설정된 연차 값 가져오기
-        # 'remaining_leave', 'granted_leave', 'annual_leave' 항목 지원 (기본값: 15.0)
+        # 시스템관리에서 설정된 연차 값 가져오기 (기본값: 15.0)
         raw_val = u.get("remaining_leave")
         if raw_val is None:
             raw_val = u.get("granted_leave", u.get("annual_leave", 15.0))
@@ -81,10 +83,10 @@ def update_user_vacation_info():
 st.session_state.user_vacation_info = update_user_vacation_info()
 
 # 현재 로그인한 사용자의 부여 연차 수치 (시스템관리에 없으면 15.0 적용)
-current_user_name = user.get("name") if user else ""
+current_user_name = user.get("name") if (user and isinstance(user, dict)) else ""
 current_user_info = st.session_state.user_vacation_info.get(
     current_user_name, 
-    {"granted": float(user.get("remaining_leave", 15.0) if user else 15.0)}
+    {"granted": float(user.get("remaining_leave", 15.0) if (user and isinstance(user, dict)) else 15.0)}
 )
 # =============================================================================
 
