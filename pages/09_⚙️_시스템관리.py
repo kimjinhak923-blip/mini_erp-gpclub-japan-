@@ -25,21 +25,41 @@ else:
             if "remaining_leave" not in df_users.columns:
                 df_users["remaining_leave"] = 15.0
 
+            # 표 헤더 한글화 및 입력 방식 설정
             edited_users = st.data_editor(
-                df_users, num_rows="dynamic", use_container_width=True
+                df_users,
+                num_rows="dynamic",
+                use_container_width=True,
+                column_config={
+                    "id": st.column_config.TextColumn("아이디", disabled=True),
+                    "name": st.column_config.TextColumn("이름"),
+                    "role": st.column_config.TextColumn("권한"),
+                    "department": st.column_config.TextColumn("부서"),
+                    "position": st.column_config.TextColumn("직급"),
+                    "remaining_leave": st.column_config.NumberColumn(
+                        "부여 연차 (일)",
+                        help="직원에게 부여된 총 연차 일수입니다.",
+                        min_value=0.0,
+                        max_value=40.0,
+                        step=0.5,
+                        format="%.1f 일",
+                    ),
+                },
             )
 
-            if st.button("💾 사용자 설정 저장"):
+            if st.button("💾 사용자 설정 저장", type="primary"):
                 updated_list = edited_users.to_dict("records")
                 st.session_state.users = updated_list
 
-                # 현재 로그인 유저 정보도 수정사항이 있다면 즉시 동기화
+                # 현재 로그인 유저 정보 동기화
                 for u in updated_list:
                     if u.get("id") == user.get("id"):
                         st.session_state.logged_in_user = u
                         break
 
-                st.success("사용자 정보 및 연차 설정이 저장되었습니다.")
+                st.success(
+                    "사용자 정보 및 연차 설정이 성공적으로 저장되었습니다."
+                )
                 st.rerun()
 
     with tab2:
