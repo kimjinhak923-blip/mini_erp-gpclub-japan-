@@ -15,7 +15,7 @@ if "clients" not in st.session_state:
     st.session_state.clients = []
 
 if "client_prices" not in st.session_state:
-    # 구조: { "거래처명": { "JAN코드": 공급가(float), ... }, ... }
+    # 구조: { "거래처명": { "JAN코드": { "product_name": ..., "capacity": ..., "list_price": ..., "supply_price": ..., "supply_rate": ... } } }
     st.session_state.client_prices = {}
 
 CLIENT_MAPS = {
@@ -122,12 +122,12 @@ with tab2:
                 st.warning("거래처명은 필수 입력 항목입니다.")
 
 # -----------------------------------------------------------------------------
-# TAB 3: 거래처별 공급가(단가) 설정 (신규 추가)
+# TAB 3: 거래처별 공급가(단가) 및 공급률 설정
 # -----------------------------------------------------------------------------
 with tab3:
-    st.subheader("🏷️ 거래처별 전용 공급가 설정")
+    st.subheader("🏷️ 거래처별 전용 공급가 & 공급률 설정")
     st.caption(
-        "거래처별로 개별 공급가를 설정해두면 출고 시 자동으로 맞춤 단가가 적용됩니다."
+        "거래처와 상품을 선택하면 소비자가 및 용량이 자동 입력되며, 공급가를 설정하여 공급률을 자동 계산 등록할 수 있습니다."
     )
 
     # 1. 등록된 거래처 목록 가져오기
@@ -137,90 +137,168 @@ with tab3:
         if isinstance(c, dict) and c.get("client_name")
     ]
 
-    # 2. 등록된 상품 마스터 가져오기
-    products = st.session_state.get("products", [])
+    # 2. 등록된 상품 마스터 가져오기 (master_products 및 products 지원)
+    products = st.session_state.get(
+        "master_products", st.session_state.get("products", [])
+    )
 
     if not client_list:
         st.warning("먼저 [거래처 신규 등록] 탭에서 거래처를 등록해 주세요.")
     elif not products:
-        st.warning("상품 마스터에 등록된 상품이 없습니다. 상품 관리 메뉴에서 상품을 먼저 등록해 주세요.")
+        st.warning("상품 마스터에 등록된 상품이 없습니다. 마스터 상품 관리 메뉴에서 상품을 먼저 등록해 주세요.")
     else:
-        # 거래처 선택 드롭다운
-        selected_client = st.selectbox(
-            "🔍 공급가를 설정할 거래처를 선택하세요",
-            options=client_list,
-            key="price_setting_client_select",
-        )
-
-        if selected_client:
-            st.markdown(f"#### 📋 **[{selected_client}]** 거래처 단가 설정표")
-
-            # 기존 저장된 단가 가져오기
-            existing_prices = st.session_state.client_prices.get(
-                selected_client, {}
+        # 거래처 및 상품 선택 섹션
+        c_col1, c_col2 = st.columns(2)
+        with c_col1:
+            selected_client = st.selectbox(
+                "🏢 1. 거래처 선택",
+                options=client_list,
+                key="sel_client_price",
             )
 
-            # 상품 마스터 데이터를 기반으로 편집용 데이터프레임 생성
-            price_table_data = []
-            for p in products:
-                jan = p.get("jan_code") or p.get("product_code", "")
-                p_name = p.get("product_name", "")
+        # 상품 맵 생성
+        prod_dict = {}
+        prod_options = []
+        for p in products:
+            jan = p.get("box_jan_code") or p.get("jan_code") or p.get("product_code", "")
+            p_name = p.get("product_name", "")
+            label = f"{p_name} [{jan}]" if jan else p_name
+            prod_dict[label] = p
+            prod_options.append(label)
 
-                # 기본 판매 단가 (기본값)
-                default_price = float(
-                    p.get("selling_price", p.get("unit_price", 0))
-                )
+        with c_col2:
+            selected_prod_label = st.selectbox(
+                "📦 2. 상품 선택",
+                options=prod_options,
+                key="sel_prod_price",
+            )
 
-                # 기존 설정된 전용 공급가가 있다면 사용, 없으면 기본 판매단가 사용
-                custom_price = float(existing_prices.get(jan, default_price))
+        # 선택된 상품 정보 추출
+        selected_p = prod_dict[selected_prod_label]
+        jan_code = selected_p.get("box_jan_code") or selected_p.get("jan_code", "")
+        product_name = selected_p.get("product_name", "")
+        capacity = selected_p.get("capacity", "-")
+        list_price = float(
+            selected_p.get("list_price_jpy_excl_tax", selected_p.get("list_price_jpy", 0))
+        )
 
-                price_table_data.append(
+        st.markdown("---")
+        st.markdown(f"##### 📝 **[{selected_client}]** 거래처에 적용할 **[{product_name}]** 공급가 설정")
+
+        # 기존 설정 정보 확인
+        client_existing_prices = st.session_state.client_prices.get(selected_client, {})
+        existing_info = client_existing_prices.get(jan_code, {})
+        
+        # 기본 공급가 설정 (기존 등록값이 있으면 사용, 없으면 소비자가의 50%를 기본값으로 지정)
+        if existing_info and "supply_price" in existing_info:
+            default_sp = float(existing_info["supply_price"])
+        else:
+            default_sp = float(list_price * 0.5) if list_price > 0 else 0.0
+
+        # 상세 입력 폼 (자동 입력 / 수동 입력 / 자동 계산)
+        col_p1, col_p2, col_p3, col_p4 = st.columns(4)
+
+        with col_p1:
+            st.text_input("용량/규격 (자동)", value=str(capacity), disabled=True)
+
+        with col_p2:
+            st.text_input("소비자 가 (엔, 세외) (자동)", value=f"¥{int(list_price):,}", disabled=True)
+
+        with col_p3:
+            supply_price = st.number_input(
+                "공급가 입력 (엔 ¥) *",
+                min_value=0,
+                value=int(default_sp),
+                step=50,
+                key=f"sp_input_{selected_client}_{jan_code}",
+            )
+
+        with col_p4:
+            # 공급률 자동 계산 (%) = (공급가 / 소비자가) * 100
+            supply_rate = round((supply_price / list_price) * 100, 2) if list_price > 0 else 0.0
+            st.text_input("공급률 (자동계산)", value=f"{supply_rate:.2f}%", disabled=True)
+
+        # 등록 저장 버튼
+        if st.button("💾 공급가 & 공급률 등록/업데이트", type="primary"):
+            if selected_client not in st.session_state.client_prices:
+                st.session_state.client_prices[selected_client] = {}
+
+            st.session_state.client_prices[selected_client][jan_code] = {
+                "jan_code": jan_code,
+                "product_name": product_name,
+                "capacity": capacity,
+                "list_price": list_price,
+                "supply_price": float(supply_price),
+                "supply_rate": supply_rate,
+            }
+
+            st.success(
+                f"[{selected_client}] 거래처에 [{product_name}] 공급가 ¥{int(supply_price):,} (공급률 {supply_rate:.2f}%) 설정이 완료되었습니다!"
+            )
+            st.rerun()
+
+        # -----------------------------------------------------------------------------
+        # 선택된 거래처의 전체 등록 공급가 목록 출력 및 수정
+        # -----------------------------------------------------------------------------
+        st.markdown("---")
+        st.markdown(f"#### 📊 **[{selected_client}]** 거래처 전용 단가표 현황")
+
+        current_prices = st.session_state.client_prices.get(selected_client, {})
+
+        if current_prices:
+            table_rows = []
+            for j_code, item in current_prices.items():
+                l_price = float(item.get("list_price", 0))
+                s_price = float(item.get("supply_price", 0))
+                s_rate = round((s_price / l_price * 100), 2) if l_price > 0 else 0.0
+
+                table_rows.append(
                     {
-                        "JAN코드": jan,
-                        "상품명": p_name,
-                        "마스터 기본 단가": default_price,
-                        "거래처 공급가 (엔)": custom_price,
+                        "JAN코드": j_code,
+                        "상품명": item.get("product_name", ""),
+                        "용량/규격": item.get("capacity", "-"),
+                        "소비자 가(엔)": l_price,
+                        "공급가(엔)": s_price,
+                        "공급률(%)": s_rate,
                     }
                 )
 
-            df_price_setting = pd.DataFrame(price_table_data)
+            df_prices = pd.DataFrame(table_rows)
 
-            # 단가 수정용 Data Editor
             edited_price_df = st.data_editor(
-                df_price_setting,
+                df_prices,
                 use_container_width=True,
                 column_config={
                     "JAN코드": st.column_config.TextColumn("JAN코드", disabled=True),
                     "상품명": st.column_config.TextColumn("상품명", disabled=True),
-                    "마스터 기본 단가": st.column_config.NumberColumn(
-                        "마스터 기본 단가", format="¥%d", disabled=True
+                    "용량/규격": st.column_config.TextColumn("용량/규격", disabled=True),
+                    "소비자 가(엔)": st.column_config.NumberColumn(
+                        "소비자 가(엔)", format="¥%d", disabled=True
                     ),
-                    "거래처 공급가 (엔)": st.column_config.NumberColumn(
-                        "거래처 공급가 (엔)",
-                        help="해당 거래처에 적용할 전용 공급가를 입력하세요.",
-                        min_value=0,
-                        step=10,
-                        format="¥%d",
+                    "공급가(엔)": st.column_config.NumberColumn(
+                        "공급가(엔)", format="¥%d", help="공급가를 수정하면 저장 시 공급률이 자동 재계산됩니다."
+                    ),
+                    "공급률(%)": st.column_config.NumberColumn(
+                        "공급률(%)", format="%.2f%%", disabled=True
                     ),
                 },
-                disabled=["JAN코드", "상품명", "마스터 기본 단가"],
-                key=f"editor_{selected_client}",
+                key=f"editor_table_{selected_client}",
             )
 
-            # 저장 버튼
-            if st.button(
-                f"💾 [{selected_client}] 공급가 설정 저장", type="primary"
-            ):
-                # 단가 dictionary 생성 { "JAN코드": 공급가 }
-                new_price_map = {}
+            if st.button(f"💾 [{selected_client}] 단가표 변경사항 저장"):
                 for row in edited_price_df.to_dict("records"):
-                    jan_code = row["JAN코드"]
-                    custom_val = float(row["거래처 공급가 (엔)"])
-                    new_price_map[jan_code] = custom_val
+                    j_c = row["JAN코드"]
+                    s_p = float(row["공급가(엔)"])
+                    l_p = float(row["소비자 가(엔)"])
+                    s_r = round((s_p / l_p * 100), 2) if l_p > 0 else 0.0
 
-                # 세션에 저장
-                st.session_state.client_prices[selected_client] = new_price_map
-                st.success(
-                    f"[{selected_client}] 거래처의 상품별 공급가가 성공적으로 저장되었습니다!"
-                )
+                    if j_c in st.session_state.client_prices[selected_client]:
+                        st.session_state.client_prices[selected_client][j_c]["supply_price"] = s_p
+                        st.session_state.client_prices[selected_client][j_c]["supply_rate"] = s_r
+
+                st.success(f"[{selected_client}] 거래처의 공급가 수정사항이 업데이트되었습니다.")
                 st.rerun()
+        else:
+            st.info(
+                f"[{selected_client}] 거래처에 등록된 상품 전용 공급가가 없습니다. 위 메뉴에서 상품을 선택해 등록해 주세요."
+            )
