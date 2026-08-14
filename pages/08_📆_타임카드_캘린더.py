@@ -3,6 +3,11 @@ import datetime
 import pandas as pd
 import streamlit as st
 
+# ==========================================
+# 0. Streamlit 최상단 설정
+# ==========================================
+st.set_page_config(page_title="타임카드 및 사내 캘린더", layout="wide")
+
 # 사이드바 예외 처리
 try:
     from sidebar_menu import render_sidebar
@@ -10,7 +15,6 @@ try:
 except Exception:
     pass
 
-st.set_page_config(page_title="타임카드 및 사내 캘린더", layout="wide")
 st.title("📅 타임카드 관리 및 스케줄/사내 캘린더")
 st.markdown("---")
 
@@ -36,9 +40,6 @@ is_admin = (logged_user.get("role") == "admin")
 
 # 관리/조회 대상 유저 세션
 if "selected_target_user" not in st.session_state:
-    st.session_state.selected_target_user = logged_user["name"]
-
-if not is_admin:
     st.session_state.selected_target_user = logged_user["name"]
 
 # 연차 데이터
@@ -115,30 +116,29 @@ def calculate_work_and_overtime(clock_in_str, clock_out_str, manual_break=None, 
         t_std_in = datetime.datetime.strptime("09:00", "%H:%M")
         t_std_out = datetime.datetime.strptime("18:00", "%H:%M")
 
-        # 근무시간 계산
-        if t_out < t_std_out:
-            work_diff = (t_out - t_in).total_seconds() / 3600.0
-            work_hours = max(0.0, round(work_diff, 2))
-        else:
-            work_hours = 8.00
+        total_presence = max(0.0, (t_out - t_in).total_seconds() / 3600.0)
 
-        # 휴식시간 계산: 8시간 이상 근무시에만 1.00 적용
         if manual_break is not None and manual_break != "":
             break_hours = float(manual_break)
         else:
-            break_hours = 1.00 if work_hours >= 8.0 else 0.00
+            break_hours = 1.00 if total_presence >= 8.0 else 0.00
 
-        # 잔업시간 계산
+        effective_in = max(t_in, t_std_in)
+        effective_out = min(t_out, t_std_out)
+        
+        if effective_out > effective_in:
+            raw_std_work = (effective_out - effective_in).total_seconds() / 3600.0
+            work_hours = max(0.0, round(raw_std_work - break_hours, 2))
+        else:
+            work_hours = 0.0
+
         overtime_hours = 0.0
         if t_out > t_std_out:
             overtime_seconds = (t_out - t_std_out).total_seconds()
-            overtime_minutes = int(overtime_seconds // 60)
-            overtime_hours = round(overtime_minutes / 60.0, 2)
+            overtime_hours = round(overtime_seconds / 3600.0, 2)
 
-        # 총 근무시간 = 근무시간 + 잔업시간
         total_work_hours = round(work_hours + overtime_hours, 2)
 
-        # 지각 / 조퇴 계산
         if manual_late is not None:
             late_mins = int(manual_late)
         else:
@@ -154,33 +154,30 @@ def calculate_work_and_overtime(clock_in_str, clock_out_str, manual_break=None, 
         return 0.0, 0.0, 0, 0, 0.0, 0.0
 
 # ==========================================
-# 3. 👤 사용자 권한 선택 & 상단 컨트롤 (드롭다운으로 직원 전환)
+# 3. 👤 직원별 타임카드 선택 드롭다운 (추가/강화)
 # ==========================================
 user_list = [u["name"] for u in st.session_state.users]
 
-if is_admin:
-    col_adm1, col_adm2 = st.columns([2, 3])
-    with col_adm1:
-        # 안전하게 선택 인덱스 조회
-        current_idx = user_list.index(st.session_state.selected_target_user) if st.session_state.selected_target_user in user_list else 0
-        selected_user = st.selectbox(
-            "👤 [관리자] 타임카드/캘린더 조회 직원 선택",
-            user_list,
-            index=current_idx,
-            key="admin_user_selector"
-        )
-        # 선택된 직원으로 세션 갱신
-        st.session_state.selected_target_user = selected_user
+col_sel1, col_sel2 = st.columns([2, 3])
+with col_sel1:
+    current_idx = user_list.index(st.session_state.selected_target_user) if st.session_state.selected_target_user in user_list else 0
+    selected_user = st.selectbox(
+        "👤 직원 선택 (타임카드 / 캘린더 조회 대상)",
+        user_list,
+        index=current_idx,
+        key="target_user_selector"
+    )
+    st.session_state.selected_target_user = selected_user
 
-    with col_adm2:
-        st.info(f"🔑 관리자 권한 활성화: 현재 **[{st.session_state.selected_target_user}]** 님의 타임카드 및 캘린더를 조회 중입니다.")
-else:
-    st.session_state.selected_target_user = logged_user["name"]
-    st.success(f"👤 **[{logged_user['name']}]** 님의 개인 타임카드 및 스케줄 화면입니다.")
+with col_sel2:
+    if is_admin:
+        st.info(f"🔑 [관리자 권한] **[{st.session_state.selected_target_user}]** 님의 타임카드 및 캘린더를 조회 중입니다.")
+    else:
+        st.success(f"👤 **[{st.session_state.selected_target_user}]** 님의 타임카드 및 캘린더 정보입니다.")
 
 target_user = st.session_state.selected_target_user
 
-# 연차 정보
+# 연차 정보 안전 초기화
 if target_user not in st.session_state.user_vacation_info:
     st.session_state.user_vacation_info[target_user] = {"granted": 15.0, "used": 0.0}
 
@@ -330,7 +327,7 @@ with c_act3:
                 st.rerun()
 
 # ==========================================
-# 5. 📊 최상단 월간 근태 통계 요약 (선택된 직원 대상)
+# 5. 📊 최상단 월간 근태 통계 요약
 # ==========================================
 weekdays_kr = ["월", "화", "수", "목", "금", "토", "일"]
 _, last_day = calendar.monthrange(year, month)
@@ -350,7 +347,7 @@ for d in range(1, last_day + 1):
             att.get("break_hours"), att.get("late_mins"), att.get("early_mins")
         )
         tot_days += 1
-        tot_work_h += w_h
+        tot_work_h += t_w_h
         tot_over_h += o_h
         if l_m > 0 or att.get("status") == "지각":
             tot_late_c += 1
@@ -360,13 +357,13 @@ for d in range(1, last_day + 1):
 st.markdown(f"##### 📊 [{target_user}] 님 {year}년 {month}월 근태 통계 요약")
 m1, m2, m3, m4, m5 = st.columns(5)
 m1.metric("총 근무일수", f"{tot_days} 일")
-m2.metric("총 근무시간", f"{tot_work_h:.2f}")
-m3.metric("연장(잔업)시간", f"{tot_over_h:.2f}")
+m2.metric("총 근무시간", f"{tot_work_h:.2f} 시간")
+m3.metric("연장(잔업)시간", f"{tot_over_h:.2f} 시간")
 m4.metric("지각 횟수", f"{tot_late_c} 회")
 m5.metric("조퇴 횟수", f"{tot_early_c} 회")
 
 # ==========================================
-# 6. 📅 캘린더 뷰 (선택된 직원 대상)
+# 6. 📅 캘린더 뷰 (3줄 줄바꿈 표기 반영)
 # ==========================================
 st.markdown("---")
 st.subheader(f"📅 [{target_user}] 님 {year}년 {month}월 캘린더")
@@ -396,28 +393,43 @@ if "1️⃣" in cal_mode:
                 curr_d_str = f"{year}-{month:02d}-{day_counter:02d}"
                 att_day = next((a for a in st.session_state.attendance_logs if a["date"] == curr_d_str and a.get("user_name") == target_user), None)
 
-                box_content = f"**{day_counter}일**\n\n"
+                # 날짜 및 근무 내용 3줄 분리 적용
                 if att_day and att_day.get("clock_in") and att_day.get("clock_in") != "-":
                     w_h, o_h, l_m, e_m, b_h, t_w_h = calculate_work_and_overtime(
                         att_day.get("clock_in"), att_day.get("clock_out"),
                         att_day.get("break_hours"), att_day.get("late_mins"), att_day.get("early_mins")
                     )
-                    # 요하신 줄바꿈 형식으로 적용된 부분
-                    box_content += f"⏰ {att_day.get('clock_in','-')}-{att_day.get('clock_out','-')}\n"
-                    box_content += f"⏱️ 근무: {w_h:.2f}\n"
-                    box_content += f"(잔업 {o_h:.2f})\n"
                     
+                    line1 = f"⏰{att_day.get('clock_in','-')}-{att_day.get('clock_out','-')}"
+                    line2 = f"⏱️근무:{t_w_h:.2f}"
+                    line3 = f"(잔업 {o_h:.2f})"
+                    
+                    extra_status = ""
                     if l_m > 0:
-                        box_content += f"⚠️ `지각 {l_m}분` "
+                        extra_status += f"<br>⚠️ 지각 {l_m}분"
                     if e_m > 0:
-                        box_content += f"⚠️ `조퇴 {e_m}분` "
+                        extra_status += f"<br>⚠️ 조퇴 {e_m}분"
                     if att_day.get("status") and att_day.get("status") != "정상근무":
-                        box_content += f"\n🏷️ `{att_day.get('status')}`"
-                    box_content += "\n"
-                else:
-                    box_content += "─\n"
+                        extra_status += f"<br>🏷️ {att_day.get('status')}"
 
-                grid_cols[idx].info(box_content)
+                    card_html = f"""
+                    <div style="background-color: #eef6ff; padding: 8px; border-radius: 5px; border: 1px solid #cce0ff; margin-bottom: 5px; font-size: 0.88rem; line-height: 1.4;">
+                        <b>{day_counter}일</b><br>
+                        {line1}<br>
+                        {line2}<br>
+                        {line3}
+                        {extra_status}
+                    </div>
+                    """
+                else:
+                    card_html = f"""
+                    <div style="background-color: #f9f9f9; padding: 8px; border-radius: 5px; border: 1px solid #eee; margin-bottom: 5px; font-size: 0.88rem; color: #888;">
+                        <b>{day_counter}일</b><br>
+                        ─
+                    </div>
+                    """
+
+                grid_cols[idx].markdown(card_html, unsafe_allow_html=True)
                 day_counter += 1
 
 else:
@@ -449,7 +461,7 @@ else:
                 day_counter += 1
 
 # ==========================================
-# 7. 📋 타임카드 테이블 (선택된 직원 대상)
+# 7. 📋 타임카드 테이블
 # ==========================================
 st.markdown("---")
 st.subheader(f"📋 [{target_user}] 님 일별 타임카드 상세 내역")
