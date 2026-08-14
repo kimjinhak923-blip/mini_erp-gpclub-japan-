@@ -1,13 +1,15 @@
 import streamlit as st
 
-# ⚠️ [필수] import 다음 가장 첫 번째 Streamlit 명령어로 작성되어야 합니다.
+# ⚠️ [필수] 모든 Streamlit 코드 중 최상단에 배치
 st.set_page_config(
     page_title="사내 통합 관리 시스템 (ERP)",
     page_layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# --- 세션 데이터 초기화 ---
+# ---------------------------------------------------------
+# [전체 세션 데이터 초기화 - 기존 기능 100% 보존]
+# ---------------------------------------------------------
 if "lang" not in st.session_state:
     st.session_state.lang = "한국어"
 
@@ -23,6 +25,8 @@ if "users" not in st.session_state:
             "role": "CEO / 관리자",
             "position": "대표이사",
             "approved": True,
+            "hire_date": "2020-01-01",
+            "remaining_leave": 15,
         },
         {
             "id": "user1",
@@ -31,10 +35,67 @@ if "users" not in st.session_state:
             "role": "일반 사용자",
             "position": "사원",
             "approved": True,
+            "hire_date": "2023-03-01",
+            "remaining_leave": 12,
         },
     ]
 
-# --- 로그인 / 회원가입 메인 화면 ---
+if "warehouses" not in st.session_state:
+    st.session_state.warehouses = ["도쿄 메인 창고", "오사카 물류 센터"]
+
+if "positions" not in st.session_state:
+    st.session_state.positions = ["대표이사", "이사", "부장", "차장", "과장", "대리", "사원"]
+
+if "master_products" not in st.session_state:
+    st.session_state.master_products = [
+        {
+            "jan_code": "4580000000001",
+            "product_name": "프리미엄 수분 크림 50ml",
+            "category": "스킨케어",
+            "capacity": "50ml",
+            "units_per_box": 24,
+            "box_cbm": 0.02,
+            "box_weight_kg": 8.5,
+            "plt_qty": 40,
+            "supply_price_jpy": 1200,
+            "list_price_jpy": 2500,
+            "memo": "주력 상품",
+        }
+    ]
+
+if "warehouse_stocks" not in st.session_state:
+    st.session_state.warehouse_stocks = [
+        {"warehouse": "도쿄 메인 창고", "jan_code": "4580000000001", "product_name": "프리미엄 수분 크림 50ml", "stock_qty": 150}
+    ]
+
+if "clients" not in st.session_state:
+    st.session_state.clients = [
+        {
+            "client_name": "(주)파트너스 코리아",
+            "business_type": "도매",
+            "contact_person": "이팀장",
+            "phone": "03-1234-5678",
+            "email": "partner@example.com",
+            "postal_code": "100-0001",
+            "address": "東京都千代田区1-1",
+        }
+    ]
+
+if "client_products" not in st.session_state:
+    st.session_state.client_products = []
+
+if "stock_logs" not in st.session_state:
+    st.session_state.stock_logs = []
+
+if "leave_records" not in st.session_state:
+    st.session_state.leave_records = []
+
+if "company_holidays" not in st.session_state:
+    st.session_state.company_holidays = []
+
+# ---------------------------------------------------------
+# [로그인 화면 및 분기]
+# ---------------------------------------------------------
 if not st.session_state.logged_in_user:
     st.title("🏢 사내 통합 관리 시스템")
     st.markdown("---")
@@ -71,10 +132,11 @@ if not st.session_state.logged_in_user:
                         "role": "일반 사용자",
                         "position": "사원",
                         "approved": False,
+                        "hire_date": "2026-01-01",
+                        "remaining_leave": 10,
                     })
                     st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인할 수 있습니다.")
                 else:
                     st.error("모든 항목을 입력해주세요.")
 else:
-    # 이미 로그인된 경우 1번 출퇴근시스템 페이지로 이동
     st.switch_page("pages/01_⏱️_출퇴근시스템.py")
