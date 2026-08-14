@@ -177,78 +177,93 @@ else:
     with tab2:
         st.subheader("거래처별 출고 제품 상세 조회")
 
-        # 거래처 관리 데이터와 출고 이력 내 거래처 통합
+        # 1. 거래처 관리 데이터 및 출고 이력 거래처 추출 (None 및 비문자열 안전 제거)
         registered_clients = [
-            c.get("name") for c in st.session_state.get("clients", []) if c
+            str(c.get("name")).strip()
+            for c in st.session_state.get("clients", [])
+            if isinstance(c, dict) and c.get("name")
         ]
-        history_clients = list(out_df["client_name"].unique())
+
+        history_clients = [
+            str(name).strip()
+            for name in out_df["client_name"].unique()
+            if pd.notna(name) and str(name).strip() != ""
+        ]
+
+        # 2. 중복 제거 및 문자열 정렬 (TypeError 방지 안전 처리)
         all_client_options = sorted(
             list(set(registered_clients + history_clients))
         )
 
-        selected_target_client = st.selectbox(
-            "🔍 조회할 거래처를 선택하세요",
-            options=all_client_options,
-            key="tab2_client_select",
-        )
+        # 거래처 선택 드롭다운
+        if not all_client_options:
+            st.info("등록되거나 출고된 거래처 내역이 없습니다.")
+        else:
+            selected_target_client = st.selectbox(
+                "🔍 조회할 거래처를 선택하세요",
+                options=all_client_options,
+                key="tab2_client_select",
+            )
 
-        if selected_target_client:
-            client_filtered_df = out_df[
-                out_df["client_name"] == selected_target_client
-            ].copy()
+            if selected_target_client:
+                client_filtered_df = out_df[
+                    out_df["client_name"] == selected_target_client
+                ].copy()
 
-            if not client_filtered_df.empty:
-                client_filtered_df["date"] = client_filtered_df[
-                    "date"
-                ].dt.strftime("%Y-%m-%d")
-                client_filtered_df["qty_fmt"] = client_filtered_df[
-                    "qty"
-                ].apply(lambda x: f"{int(x):,}")
-                client_filtered_df["unit_price_fmt"] = client_filtered_df[
-                    "unit_price"
-                ].apply(lambda x: f"¥{int(x):,}")
-                client_filtered_df["total_amount_fmt"] = client_filtered_df[
-                    "total_amount"
-                ].apply(lambda x: f"¥{int(x):,}")
+                if not client_filtered_df.empty:
+                    client_filtered_df["date"] = client_filtered_df[
+                        "date"
+                    ].dt.strftime("%Y-%m-%d")
+                    client_filtered_df["qty_fmt"] = client_filtered_df[
+                        "qty"
+                    ].apply(lambda x: f"{int(x):,}")
+                    client_filtered_df["unit_price_fmt"] = client_filtered_df[
+                        "unit_price"
+                    ].apply(lambda x: f"¥{int(x):,}")
+                    client_filtered_df["total_amount_fmt"] = (
+                        client_filtered_df["total_amount"].apply(
+                            lambda x: f"¥{int(x):,}"
+                        )
+                    )
 
-                # 요약 수치
-                c_qty = int(client_filtered_df["qty"].sum())
-                c_amt = int(client_filtered_df["total_amount"].sum())
+                    # 요약 수치
+                    c_qty = int(client_filtered_df["qty"].sum())
+                    c_amt = int(client_filtered_df["total_amount"].sum())
 
-                st.markdown(
-                    f"**[{selected_target_client}]** 검색 조건 합계: **총 {c_qty:,}개** / **총 발주금액 ¥{c_amt:,}**"
-                )
+                    st.markdown(
+                        f"**[{selected_target_client}]** 검색 조건 합계: **총 {c_qty:,}개** / **총 발주금액 ¥{c_amt:,}**"
+                    )
 
-                show_client_df = client_filtered_df[
-                    [
-                        "date",
-                        "order_no",
-                        "jan_code",
-                        "product_name",
-                        "purpose",
-                        "qty_fmt",
-                        "unit_price_fmt",
-                        "total_amount_fmt",
-                        "warehouse",
-                    ]
-                ].rename(
-                    columns={
-                        "date": "일자",
-                        "order_no": "발주코드",
-                        "jan_code": "JAN코드",
-                        "product_name": "상품명",
-                        "purpose": "용도",
-                        "qty_fmt": "수량",
-                        "unit_price_fmt": "단가",
-                        "total_amount_fmt": "발주금액",
-                        "warehouse": "창고",
-                    }
-                )
-                st.dataframe(show_client_df, use_container_width=True)
-            else:
-                st.info(
-                    f"'{selected_target_client}' 거래처의 조건에 부합하는 출고 내역이 없습니다."
-                )
+                    show_client_df = client_filtered_df[
+                        [
+                            "date",
+                            "order_no",
+                            "jan_code",
+                            "product_name",
+                            "purpose",
+                            "qty_fmt",
+                            "unit_price_fmt",
+                            "total_amount_fmt",
+                            "warehouse",
+                        ]
+                    ].rename(
+                        columns={
+                            "date": "일자",
+                            "order_no": "발주코드",
+                            "jan_code": "JAN코드",
+                            "product_name": "상품명",
+                            "purpose": "용도",
+                            "qty_fmt": "수량",
+                            "unit_price_fmt": "단가",
+                            "total_amount_fmt": "발주금액",
+                            "warehouse": "창고",
+                        }
+                    )
+                    st.dataframe(show_client_df, use_container_width=True)
+                else:
+                    st.info(
+                        f"'{selected_target_client}' 거래처의 조건에 부합하는 출고 내역이 없습니다."
+                    )
 
     # -------------------------------------------------------------------------
     # TAB 3: 상품별 출고 현황 (기존 기능 유지 및 포맷팅)
