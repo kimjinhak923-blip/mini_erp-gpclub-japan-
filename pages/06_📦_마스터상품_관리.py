@@ -62,7 +62,7 @@ tab1, tab2, tab3 = st.tabs(
 )
 
 # -----------------------------------------------------------------------------
-# TAB 1: 등록된 상품 마스터 목록
+# TAB 1: 등록된 상품 마스터 목록 & 삭제 기능
 # -----------------------------------------------------------------------------
 with tab1:
     st.subheader("등록된 마스터 상품 목록")
@@ -83,8 +83,12 @@ with tab1:
         if "outer_box_dim" not in df_p.columns:
             df_p["outer_box_dim"] = "-"
 
-        # 필요 칼럼 순서 정렬
+        # 삭제용 체크박스 칼럼 추가 (기본값 False)
+        df_p["선택"] = False
+
+        # 필요 칼럼 순서 정렬 ("선택" 열을 제일 앞으로 배치)
         target_cols = [
+            "선택",
             "box_jan_code",
             "single_jan_code",
             "product_name",
@@ -100,47 +104,72 @@ with tab1:
         df_p_filtered = df_p[existing_cols]
 
         # 칼럼명 변경 (다국어)
-        df_p_renamed = df_p_filtered.rename(
-            columns=COLUMN_MAPS.get(lang, COLUMN_MAPS["한국어"])
-        )
+        mapping_dict = COLUMN_MAPS.get(lang, COLUMN_MAPS["한국어"])
+        mapping_dict["선택"] = "선택"  # 선택 체크박스 칼럼 유지
+        df_p_renamed = df_p_filtered.rename(columns=mapping_dict)
 
         edited_df = st.data_editor(
             df_p_renamed,
             num_rows="dynamic",
             use_container_width=True,
             column_config={
-                "매입단가(원)": st.column_config.NumberColumn(
-                    "매입단가(원)", format="₩%d"
-                ),
-                "소비자 가(엔, 세외)": st.column_config.NumberColumn(
-                    "소비자 가(엔, 세외)", format="¥%d"
-                ),
-                "BOX 입수량(EA)": st.column_config.NumberColumn(
-                    "BOX 입수량(EA)", format="%d"
-                ),
+                "선택": st.column_config.CheckboxColumn("선택", help="삭제할 상품을 체크하세요.", default=False),
+                "매입단가(원)": st.column_config.NumberColumn("매입단가(원)", format="₩%d"),
+                "소비자 가(엔, 세외)": st.column_config.NumberColumn("소비자 가(엔, 세외)", format="¥%d"),
+                "BOX 입수량(EA)": st.column_config.NumberColumn("BOX 입수량(EA)", format="%d"),
             },
+            key="master_product_editor",
         )
 
-        if st.button("💾 상품 변경사항 저장", type="primary"):
-            inv_map = {
-                v: k
-                for k, v in COLUMN_MAPS.get(
-                    lang, COLUMN_MAPS["한국어"]
-                ).items()
-            }
-            saved_records = edited_df.rename(columns=inv_map).to_dict("records")
+        btn_col1, btn_col2, _ = st.columns([1.5, 1.5, 5])
 
-            # jan_code 키 동기화 (타 화면 참조용)
-            for item in saved_records:
-                item["jan_code"] = item.get("box_jan_code", "")
+        # 1. 수정사항 저장 버튼
+        with btn_col1:
+            if st.button("💾 상품 변경사항 저장", type="primary", use_container_width=True):
+                # '선택' 열 제거 후 저장
+                save_df = edited_df.drop(columns=["선택"], errors="ignore")
 
-            st.session_state.master_products = saved_records
-            st.session_state.products = (
-                saved_records  # 전체 시스템 공유용 상품 세션 동기화
-            )
+                inv_map = {
+                    v: k
+                    for k, v in COLUMN_MAPS.get(lang, COLUMN_MAPS["한국어"]).items()
+                }
+                saved_records = save_df.rename(columns=inv_map).to_dict("records")
 
-            st.success("상품 마스터가 성공적으로 저장되었습니다.")
-            st.rerun()
+                # jan_code 키 동기화 (타 화면 참조용)
+                for item in saved_records:
+                    item["jan_code"] = item.get("box_jan_code", "")
+
+                st.session_state.master_products = saved_records
+                st.session_state.products = saved_records  # 전체 시스템 공유용 상품 세션 동기화
+
+                st.success("상품 마스터가 성공적으로 저장되었습니다.")
+                st.rerun()
+
+        # 2. 선택 항목 삭제 버튼
+        with btn_col2:
+            if st.button("🗑️ 선택한 상품 삭제", type="secondary", use_container_width=True):
+                selected_rows = edited_df[edited_df["선택"] == True]
+
+                if selected_rows.empty:
+                    st.warning("삭제할 상품을 목록에서 먼저 체크해 주세요.")
+                else:
+                    # 선택 안 된 행들만 남기기
+                    remaining_df = edited_df[edited_df["선택"] == False].drop(columns=["선택"], errors="ignore")
+
+                    inv_map = {
+                        v: k
+                        for k, v in COLUMN_MAPS.get(lang, COLUMN_MAPS["한국어"]).items()
+                    }
+                    updated_records = remaining_df.rename(columns=inv_map).to_dict("records")
+
+                    for item in updated_records:
+                        item["jan_code"] = item.get("box_jan_code", "")
+
+                    st.session_state.master_products = updated_records
+                    st.session_state.products = updated_records  # 시스템 동기화
+
+                    st.success(f"{len(selected_rows)}개 상품이 성공적으로 삭제되었습니다.")
+                    st.rerun()
     else:
         st.info("등록된 상품이 없습니다. [신규 상품 등록] 탭에서 등록해 주세요.")
 
