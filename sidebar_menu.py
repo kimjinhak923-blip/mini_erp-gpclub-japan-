@@ -12,11 +12,6 @@ def render_sidebar():
 
     user = st.session_state.logged_in_user
 
-    # 1. 상단 클릭 불가능한 ERP Main 텍스트
-    st.sidebar.markdown("### 🏢 **ERP Main**")
-    st.sidebar.caption("사내 통합 관리 시스템")
-    st.sidebar.markdown("---")
-
     # 3. 메뉴 하단 번역 선택기 복구
     st.sidebar.subheader("🌐 번역 선택 / Language")
     current_lang = st.session_state.get("lang", "한국어")
