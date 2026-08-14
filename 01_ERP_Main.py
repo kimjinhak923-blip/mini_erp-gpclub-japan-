@@ -148,4 +148,4 @@ if not st.session_state.logged_in_user:
                 else:
                     st.error("모든 항목을 입력해주세요.")
 else:
-    st.switch_page("pages/01_⏱️_출퇴근시스템.py")
+    st.switch_page("pages/01_📊_대시보드.py")
