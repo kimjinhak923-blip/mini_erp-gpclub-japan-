@@ -103,6 +103,12 @@ if "schedule_requests" not in st.session_state:
 if "editing_date" not in st.session_state:
     st.session_state.editing_date = None
 
+# 🇯🇵 일본 공휴일 마스터 데이터 연동 (예: 2026년 8월 산의 날 8/11, 대체휴일 8/12 등)
+JAPAN_HOLIDAYS = [
+    "2026-08-11", # 산의 날
+    "2026-08-12", # 대체휴무
+]
+
 # ==========================================
 # 2. ⏱️ 근무/잔업 정밀 계산 로직
 # ==========================================
@@ -363,7 +369,7 @@ m4.metric("지각 횟수", f"{tot_late_c} 회")
 m5.metric("조퇴 횟수", f"{tot_early_c} 회")
 
 # ==========================================
-# 6. 📅 캘린더 뷰 (3줄 줄바꿈 표기 반영)
+# 6. 📅 캘린더 뷰 (수정사항 1 반영: 근무/근태 캘린더 시인성 보정)
 # ==========================================
 st.markdown("---")
 st.subheader(f"📅 [{target_user}] 님 {year}년 {month}월 캘린더")
@@ -393,38 +399,38 @@ if "1️⃣" in cal_mode:
                 curr_d_str = f"{year}-{month:02d}-{day_counter:02d}"
                 att_day = next((a for a in st.session_state.attendance_logs if a["date"] == curr_d_str and a.get("user_name") == target_user), None)
 
-                # 날짜 및 근무 내용 3줄 분리 적용
+                # [수정 1] 배경색 대비를 명확히 하여 글자가 또렷하게 보이도록 CSS 보정
                 if att_day and att_day.get("clock_in") and att_day.get("clock_in") != "-":
                     w_h, o_h, l_m, e_m, b_h, t_w_h = calculate_work_and_overtime(
                         att_day.get("clock_in"), att_day.get("clock_out"),
                         att_day.get("break_hours"), att_day.get("late_mins"), att_day.get("early_mins")
                     )
                     
-                    line1 = f"⏰{att_day.get('clock_in','-')}-{att_day.get('clock_out','-')}"
-                    line2 = f"⏱️근무:{t_w_h:.2f}"
-                    line3 = f"(잔업 {o_h:.2f})"
+                    line1 = f"⏰ {att_day.get('clock_in','-')} ~ {att_day.get('clock_out','-')}"
+                    line2 = f"⏱️ 근무: {t_w_h:.2f}h"
+                    line3 = f"(잔업 {o_h:.2f}h)"
                     
                     extra_status = ""
                     if l_m > 0:
-                        extra_status += f"<br>⚠️ 지각 {l_m}분"
+                        extra_status += f"<br><span style='color: #C53030; font-weight: bold;'>⚠️ 지각 {l_m}분</span>"
                     if e_m > 0:
-                        extra_status += f"<br>⚠️ 조퇴 {e_m}분"
+                        extra_status += f"<br><span style='color: #DD6B20; font-weight: bold;'>⚠️ 조퇴 {e_m}분</span>"
                     if att_day.get("status") and att_day.get("status") != "정상근무":
-                        extra_status += f"<br>🏷️ {att_day.get('status')}"
+                        extra_status += f"<br><span style='color: #2B6CB0; font-weight: bold;'>🏷️ {att_day.get('status')}</span>"
 
                     card_html = f"""
-                    <div style="background-color: #eef6ff; padding: 8px; border-radius: 5px; border: 1px solid #cce0ff; margin-bottom: 5px; font-size: 0.88rem; line-height: 1.4;">
-                        <b>{day_counter}일</b><br>
-                        {line1}<br>
-                        {line2}<br>
-                        {line3}
+                    <div style="background-color: #EBF5FF; color: #1A202C; padding: 8px; border-radius: 6px; border: 1px solid #BEE3F8; margin-bottom: 5px; font-size: 0.88rem; line-height: 1.4;">
+                        <b style="color: #2D3748; font-size: 0.95rem;">{day_counter}일</b><br>
+                        <span style="color: #2B6CB0; font-weight: 600;">{line1}</span><br>
+                        <span style="color: #1A202C;">{line2}</span><br>
+                        <span style="color: #4A5568;">{line3}</span>
                         {extra_status}
                     </div>
                     """
                 else:
                     card_html = f"""
-                    <div style="background-color: #f9f9f9; padding: 8px; border-radius: 5px; border: 1px solid #eee; margin-bottom: 5px; font-size: 0.88rem; color: #888;">
-                        <b>{day_counter}일</b><br>
+                    <div style="background-color: #F7FAFC; color: #A0AEC0; padding: 8px; border-radius: 6px; border: 1px solid #E2E8F0; margin-bottom: 5px; font-size: 0.88rem;">
+                        <b style="color: #718096;">{day_counter}일</b><br>
                         ─
                     </div>
                     """
@@ -461,7 +467,7 @@ else:
                 day_counter += 1
 
 # ==========================================
-# 7. 📋 타임카드 테이블
+# 7. 📋 타임카드 테이블 (수정사항 2 반영: 주말/공휴일 색상 강조 및 기본 휴무일 상태)
 # ==========================================
 st.markdown("---")
 st.subheader(f"📋 [{target_user}] 님 일별 타임카드 상세 내역")
@@ -485,15 +491,21 @@ st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
 for d in range(1, last_day + 1):
     curr_date = datetime.date(year, month, d)
     date_str = curr_date.strftime("%Y-%m-%d")
-    is_weekend_day = curr_date.weekday() in [5, 6]
-    date_disp = f"{month}/{d}({weekdays_kr[curr_date.weekday()]})"
+    weekday_num = curr_date.weekday() # 0:월 ~ 5:토, 6:일
+    
+    # [수정 2] 토요일, 일요일, 일본 공휴일 연동 판단 로직
+    is_saturday = (weekday_num == 5)
+    is_sunday = (weekday_num == 6)
+    is_japan_holiday = (date_str in JAPAN_HOLIDAYS)
+    is_off_day = is_saturday or is_sunday or is_japan_holiday
 
     att = next((a for a in st.session_state.attendance_logs if a["date"] == date_str and a.get("user_name") == target_user), None)
 
-    if is_weekend_day and (not att or not att.get("clock_in") or att.get("clock_in") == "-"):
+    # [수정 2] 주말/공휴일 기본 상태를 '휴무일'로 설정 (출퇴근 기록이 없는 경우)
+    if is_off_day and (not att or not att.get("clock_in") or att.get("clock_in") == "-"):
         c_in = "-"
         c_out = "-"
-        stat = "미기록"
+        stat = "휴무일"
         note = ""
         w_hrs, o_hrs, l_mins, e_mins, b_hrs, tot_w_hrs = 0.0, 0.0, 0, 0, 0.0, 0.0
     else:
@@ -502,13 +514,27 @@ for d in range(1, last_day + 1):
         m_break = att.get("break_hours") if att else None
         m_late = att.get("late_mins") if att else None
         m_early = att.get("early_mins") if att else None
-        stat = att.get("status", "미기록") if att else "미기록"
+        
+        # 주말/공휴일 기록이 기본 '미기록'인 경우에도 '휴무일'로 우선 표시
+        default_stat_val = "휴무일" if is_off_day else "미기록"
+        stat = att.get("status", default_stat_val) if att else default_stat_val
         note = att.get("note", "") if att else ""
 
         w_hrs, o_hrs, l_mins, e_mins, b_hrs, tot_w_hrs = calculate_work_and_overtime(c_in, c_out, m_break, m_late, m_early)
 
+    # [수정 2] 토요일(파란계열), 일요일/공휴일(붉은계열) 가시성 스타일 적용
+    date_label = f"{month}/{d}({weekdays_kr[weekday_num]})"
+    if is_saturday:
+        date_disp = f"<span style='color: #1D4ED8; font-weight: bold; background-color: #EFF6FF; padding: 2px 6px; border-radius: 4px;'>{date_label}</span>"
+    elif is_sunday or is_japan_holiday:
+        holiday_tag = " (공휴일)" if is_japan_holiday and not is_sunday else ""
+        date_disp = f"<span style='color: #DC2626; font-weight: bold; background-color: #FEF2F2; padding: 2px 6px; border-radius: 4px;'>{date_label}{holiday_tag}</span>"
+    else:
+        date_disp = date_label
+
     c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12 = st.columns([1.2, 1, 1, 1, 1, 1.2, 0.8, 0.8, 0.8, 1, 1.5, 0.8])
-    c1.write(date_disp)
+    
+    c1.markdown(date_disp, unsafe_allow_html=True)
     c2.write(c_in)
     c3.write(c_out)
     c4.write(f"**{w_hrs:.2f}**")
@@ -517,7 +543,13 @@ for d in range(1, last_day + 1):
     c7.write(str(l_mins))
     c8.write(str(e_mins))
     c9.write(f"{b_hrs:.2f}")
-    c10.write(stat)
+    
+    # 상태 열 텍스트 스타일링 (휴무일 강조)
+    if stat == "휴무일":
+        c10.markdown(f"<span style='color: #718096; font-weight: bold;'>{stat}</span>", unsafe_allow_html=True)
+    else:
+        c10.write(stat)
+        
     c11.write(note)
 
     if c12.button("✏️", key=f"btn_edit_{date_str}"):
@@ -529,7 +561,7 @@ for d in range(1, last_day + 1):
 
     if st.session_state.editing_date == date_str:
         with st.container():
-            st.info(f"🛠️ **[{date_disp}] 타임카드 직접 수정 (지각/조퇴 입력 지원)**")
+            st.info(f"🛠️ **[{month}/{d}({weekdays_kr[weekday_num]})] 타임카드 직접 수정 (지각/조퇴 입력 지원)**")
             with st.form(f"inline_edit_form_{date_str}"):
                 ec1, ec2, ec3, ec4, ec5, ec6, ec7 = st.columns([1.5, 1.5, 1, 1, 1, 1.5, 2])
                 edit_in = ec1.text_input("출근시간", value=(c_in if c_in != "-" else "09:00"))
@@ -538,7 +570,7 @@ for d in range(1, last_day + 1):
                 edit_late = ec4.number_input("지각", value=l_mins, step=1)
                 edit_early = ec5.number_input("조퇴", value=e_mins, step=1)
                 
-                status_opts = ["정상근무", "지각", "조퇴", "연장근무", "연차/휴가", "반차", "결근"]
+                status_opts = ["정상근무", "지각", "조퇴", "연장근무", "연차/휴가", "반차", "결근", "휴무일"]
                 s_idx = status_opts.index(stat) if stat in status_opts else 0
                 edit_status = ec6.selectbox("상태", status_opts, index=s_idx)
                 edit_note = ec7.text_input("비고", value=note)
@@ -559,7 +591,7 @@ for d in range(1, last_day + 1):
                             "status": edit_status, "note": edit_note
                         })
                     st.session_state.editing_date = None
-                    st.success(f"[{date_disp}] 데이터가 수정 저장되었습니다.")
+                    st.success(f"[{month}/{d}({weekdays_kr[weekday_num]})] 데이터가 수정 저장되었습니다.")
                     st.rerun()
 
 # CSV 내보내기
@@ -567,6 +599,9 @@ export_list = []
 for d in range(1, last_day + 1):
     curr_date = datetime.date(year, month, d)
     date_str = curr_date.strftime("%Y-%m-%d")
+    weekday_num = curr_date.weekday()
+    is_off_day = (weekday_num in [5, 6]) or (date_str in JAPAN_HOLIDAYS)
+    
     att = next((a for a in st.session_state.attendance_logs if a["date"] == date_str and a.get("user_name") == target_user), None)
     c_in = att.get("clock_in", "-") if att else "-"
     c_out = att.get("clock_out", "-") if att else "-"
@@ -574,12 +609,14 @@ for d in range(1, last_day + 1):
     m_late = att.get("late_mins") if att else None
     m_early = att.get("early_mins") if att else None
     
+    default_stat_val = "휴무일" if is_off_day else "미기록"
+    
     w_hrs, o_hrs, l_mins, e_mins, b_hrs, tot_w_hrs = calculate_work_and_overtime(c_in, c_out, m_break, m_late, m_early)
     export_list.append({
         "날짜": date_str, "출근시간": c_in, "퇴근시간": c_out,
         "근무시간": w_hrs, "잔업시간": o_hrs, "총근무시간": tot_w_hrs,
         "지각": l_mins, "조퇴": e_mins, "휴식시간": b_hrs,
-        "상태": att.get("status", "미기록") if att else "미기록",
+        "상태": att.get("status", default_stat_val) if att else default_stat_val,
         "비고": att.get("note", "") if att else ""
     })
 
