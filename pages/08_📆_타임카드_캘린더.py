@@ -2,6 +2,7 @@ import calendar
 import datetime
 import pandas as pd
 import streamlit as st
+import io
 
 # ==========================================
 # 0. Streamlit 최상단 설정
@@ -647,7 +648,9 @@ for d in range(1, last_day + 1):
                     st.success(f"[{month}/{d}({weekdays_kr[weekday_num]})] 데이터가 수정 저장되었습니다.")
                     st.rerun()
 
-# CSV 내보내기
+# ==========================================
+# 📊 CSV 내보내기 (최상단 요약 통계 양식 적용)
+# ==========================================
 export_list = []
 for d in range(1, last_day + 1):
     curr_date = datetime.date(year, month, d)
@@ -683,7 +686,26 @@ for d in range(1, last_day + 1):
         "상태": stat, "비고": note
     })
 
-csv_data = pd.DataFrame(export_list).to_csv(index=False).encode('utf-8-sig')
+# CSV 최상단에 통계 요약 정보를 추가하는 로직
+df_details = pd.DataFrame(export_list)
+
+csv_buffer = io.StringIO()
+# 1) 헤더 메타데이터 작성
+csv_buffer.write(f"[ 근태 및 연차 통계 요약 ({year}년 {month}월) ]\n")
+csv_buffer.write(f"직원이름,{target_user}\n")
+csv_buffer.write(f"출력월,{year}년 {month}월\n")
+csv_buffer.write(f"총 근무일수,{tot_days}일\n")
+csv_buffer.write(f"총 근무시간,{tot_work_h:.2f}시간\n")
+csv_buffer.write(f"총 잔업시간,{tot_over_h:.2f}시간\n")
+csv_buffer.write(f"지각 횟수,{tot_late_c}회\n")
+csv_buffer.write(f"조퇴 횟수,{tot_early_c}회\n")
+csv_buffer.write(f"사용 연차,{month_used_vacation:.1f}일\n")
+csv_buffer.write(f"잔여 연차,{rem_vacation:.1f}일\n\n")
+
+# 2) 일별 상세 데이터 작성
+df_details.to_csv(csv_buffer, index=False)
+csv_data = csv_buffer.getvalue().encode('utf-8-sig')
+
 st.download_button(
     label="📥 타임카드 CSV 내보내기",
     data=csv_data,
@@ -724,54 +746,3 @@ if user_reqs:
             else:
                 st.session_state.editing_req_id = req["id"]
             st.rerun()
-
-        if col_del_btn.button("🗑️", key=f"req_del_btn_{req['id']}"):
-            st.session_state.schedule_requests = [r for r in st.session_state.schedule_requests if r["id"] != req["id"]]
-            st.success("신청 내역이 삭제되었습니다.")
-            st.rerun()
-
-        if st.session_state.editing_req_id == req["id"]:
-            with st.container():
-                st.info(f"🛠️ **[{req['date']}] 근태/휴가 신청 내역 수정**")
-                with st.form(f"form_edit_req_{req['id']}"):
-                    fe_date = st.date_input("신청 날짜", datetime.datetime.strptime(req["date"], "%Y-%m-%d").date())
-                    type_opts = ["연차/휴가", "오전반차", "오후반차", "외출", "조퇴"]
-                    t_idx = type_opts.index(req["type"]) if req["type"] in type_opts else 0
-                    fe_type = st.selectbox("신청 구분", type_opts, index=t_idx)
-                    fe_reason = st.text_area("신청 사유", value=req["reason"])
-                    
-                    if is_admin:
-                        st_opts = ["대기중", "승인완료", "반려"]
-                        s_idx = st_opts.index(req["status"]) if req["status"] in st_opts else 0
-                        fe_status = st.selectbox("승인 상태 (관리자)", st_opts, index=s_idx)
-                    else:
-                        fe_status = req["status"]
-
-                    if st.form_submit_button("💾 수정 저장", type="primary"):
-                        req.update({
-                            "date": str(fe_date),
-                            "type": fe_type,
-                            "reason": fe_reason,
-                            "status": fe_status
-                        })
-                        st.session_state.editing_req_id = None
-                        st.success("수정 저장되었습니다.")
-                        st.rerun()
-else:
-    st.caption("신청 내역이 없습니다.")
-
-if is_admin:
-    pending_reqs = [r for r in st.session_state.schedule_requests if r["status"] in ["대기중", "승인대기"]]
-    if pending_reqs:
-        st.markdown("##### ⚡ 관리자 결재 대기 건 승인/반려")
-        for p_req in pending_reqs:
-            col_p1, col_p2, col_p3 = st.columns([3, 1, 1])
-            col_p1.write(f"📌 **[{p_req['user_name']}]** {p_req['date']} - {p_req['type']} ({p_req['reason']})")
-            if col_p2.button("✅ 승인", key=f"app_ok_{p_req['id']}"):
-                p_req["status"] = "승인완료"
-                st.success("승인되었습니다.")
-                st.rerun()
-            if col_p3.button("❌ 반려", key=f"app_no_{p_req['id']}"):
-                p_req["status"] = "반려"
-                st.warning("반려되었습니다.")
-                st.rerun()
