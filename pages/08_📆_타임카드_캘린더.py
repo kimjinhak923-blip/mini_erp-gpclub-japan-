@@ -42,12 +42,12 @@ is_admin = (logged_user.get("role") == "admin")
 if "selected_target_user" not in st.session_state:
     st.session_state.selected_target_user = logged_user["name"]
 
-# 연차 데이터 (기본 부여)
+# 연차 데이터 (기본 부여 연차 마스터)
 if "user_vacation_info" not in st.session_state:
     st.session_state.user_vacation_info = {
-        "관리자": {"granted": 15.0, "used": 2.0},
-        "김사원": {"granted": 15.0, "used": 1.0},
-        "이대리": {"granted": 15.0, "used": 0.0},
+        "관리자": {"granted": 15.0},
+        "김사원": {"granted": 15.0},
+        "이대리": {"granted": 15.0},
     }
 
 # 근태 원본 데이터
@@ -190,7 +190,7 @@ target_user = st.session_state.selected_target_user
 
 # 연차 정보 안전 초기화
 if target_user not in st.session_state.user_vacation_info:
-    st.session_state.user_vacation_info[target_user] = {"granted": 15.0, "used": 0.0}
+    st.session_state.user_vacation_info[target_user] = {"granted": 15.0}
 
 # ==========================================
 # 4. ◀️ 이전달 / 다음달 ▶️ 상단 이동 툴바
@@ -333,7 +333,7 @@ with c_act3:
                 st.rerun()
 
 # ==========================================
-# 5. 📊 최상단 월간 근태 통계 요약 (연차 현황 추가)
+# 5. 📊 최상단 월간 근태 통계 요약 (월별 연차 자동 계산 적용)
 # ==========================================
 weekdays_kr = ["월", "화", "수", "목", "금", "토", "일"]
 _, last_day = calendar.monthrange(year, month)
@@ -360,8 +360,36 @@ for d in range(1, last_day + 1):
         if e_m > 0 or att.get("status") == "조퇴":
             tot_early_c += 1
 
-v_info = st.session_state.user_vacation_info[target_user]
-rem_vacation = v_info["granted"] - v_info["used"]
+# --- 💡 연차 월별 계산 및 이월 로직 ---
+granted_vacation = st.session_state.user_vacation_info[target_user]["granted"]
+
+# 1) 현재 선택한 월에 승인된 사용 연차 계산
+month_used_vacation = 0.0
+
+# 2) 선택한 월의 말일까지 누적 승인된 연차 계산 (차감 후 이월 계산용)
+cum_used_vacation = 0.0
+
+month_prefix = f"{year}-{month:02d}"
+last_day_of_month_str = f"{year}-{month:02d}-{last_day:02d}"
+
+for req in st.session_state.schedule_requests:
+    if req.get("user_name") == target_user and req.get("status") == "승인완료":
+        req_date_str = req.get("date", "")
+        days_cnt = 0.0
+        if "연차" in req.get("type", "") or "휴가" in req.get("type", ""):
+            days_cnt = 1.0
+        elif "반차" in req.get("type", ""):
+            days_cnt = 0.5
+        
+        # 선택한 월에 사용된 연차
+        if req_date_str.startswith(month_prefix):
+            month_used_vacation += days_cnt
+            
+        # 선택한 월의 말일까지 누적 사용된 연차
+        if req_date_str <= last_day_of_month_str:
+            cum_used_vacation += days_cnt
+
+rem_vacation = max(0.0, granted_vacation - cum_used_vacation)
 
 st.markdown(f"##### 📊 [{target_user}] 님 {year}년 {month}월 근태 및 연차 통계 요약")
 m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
@@ -370,8 +398,8 @@ m2.metric("총 근무시간", f"{tot_work_h:.2f} 시간")
 m3.metric("연장(잔업)시간", f"{tot_over_h:.2f} 시간")
 m4.metric("지각 횟수", f"{tot_late_c} 회")
 m5.metric("조퇴 횟수", f"{tot_early_c} 회")
-m6.metric("사용 연차", f"{v_info['used']} 일")
-m7.metric("잔여 연차", f"{rem_vacation} 일")
+m6.metric("사용 연차", f"{month_used_vacation:.1f} 일")
+m7.metric("잔여 연차", f"{rem_vacation:.1f} 일")
 
 # ==========================================
 # 6. 📅 캘린더 뷰 (승인된 연차 자동 반영)
@@ -664,7 +692,7 @@ st.download_button(
 )
 
 # ==========================================
-# 8. 📑 휴가/근태 신청 이력 및 결재 현황 (수정/삭제 추가)
+# 8. 📑 휴가/근태 신청 이력 및 결재 현황 (수정/삭제 지원)
 # ==========================================
 st.markdown("---")
 st.subheader(f"📑 [{target_user}] 님 휴가/근태 신청 이력 및 결재 현황")
@@ -698,11 +726,6 @@ if user_reqs:
             st.rerun()
 
         if col_del_btn.button("🗑️", key=f"req_del_btn_{req['id']}"):
-            if req["status"] == "승인완료":
-                if "연차" in req["type"] or "휴가" in req["type"]:
-                    st.session_state.user_vacation_info[target_user]["used"] = max(0.0, st.session_state.user_vacation_info[target_user]["used"] - 1.0)
-                elif "반차" in req["type"]:
-                    st.session_state.user_vacation_info[target_user]["used"] = max(0.0, st.session_state.user_vacation_info[target_user]["used"] - 0.5)
             st.session_state.schedule_requests = [r for r in st.session_state.schedule_requests if r["id"] != req["id"]]
             st.success("신청 내역이 삭제되었습니다.")
             st.rerun()
@@ -725,17 +748,6 @@ if user_reqs:
                         fe_status = req["status"]
 
                     if st.form_submit_button("💾 수정 저장", type="primary"):
-                        if req["status"] == "승인완료" and fe_status != "승인완료":
-                            if "연차" in req["type"] or "휴가" in req["type"]:
-                                st.session_state.user_vacation_info[target_user]["used"] = max(0.0, st.session_state.user_vacation_info[target_user]["used"] - 1.0)
-                            elif "반차" in req["type"]:
-                                st.session_state.user_vacation_info[target_user]["used"] = max(0.0, st.session_state.user_vacation_info[target_user]["used"] - 0.5)
-                        elif req["status"] != "승인완료" and fe_status == "승인완료":
-                            if "연차" in fe_type or "휴가" in fe_type:
-                                st.session_state.user_vacation_info[target_user]["used"] += 1.0
-                            elif "반차" in fe_type:
-                                st.session_state.user_vacation_info[target_user]["used"] += 0.5
-
                         req.update({
                             "date": str(fe_date),
                             "type": fe_type,
@@ -757,10 +769,6 @@ if is_admin:
             col_p1.write(f"📌 **[{p_req['user_name']}]** {p_req['date']} - {p_req['type']} ({p_req['reason']})")
             if col_p2.button("✅ 승인", key=f"app_ok_{p_req['id']}"):
                 p_req["status"] = "승인완료"
-                if "연차" in p_req["type"] or "휴가" in p_req["type"]:
-                    st.session_state.user_vacation_info[p_req['user_name']]["used"] += 1.0
-                elif "반차" in p_req["type"]:
-                    st.session_state.user_vacation_info[p_req['user_name']]["used"] += 0.5
                 st.success("승인되었습니다.")
                 st.rerun()
             if col_p3.button("❌ 반려", key=f"app_no_{p_req['id']}"):
