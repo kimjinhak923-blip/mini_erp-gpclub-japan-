@@ -753,9 +753,15 @@ st.download_button(
 )
 
 # =============================================================================
-# 8. 📑 휴가/근태 신청 이력 및 결재 현황 (관리자 수정/삭제/연차복구 지원)
+# 8. 📑 휴가/근태 신청 이력 및 결재 현황 (권한 제어 및 실시간 데이터 연동)
 # =============================================================================
 st.markdown("---")
+
+# 1. 로그인 사용자 및 관리자 권한 확인
+login_user = st.session_state.get("logged_in_user", {})
+user_role = login_user.get("role", "") if isinstance(login_user, dict) else ""
+is_admin = "관리자" in user_role or "CEO" in user_role
+
 st.subheader(f"📑 [{target_user}] 님 휴가/근태 신청 이력 및 결재 현황")
 
 # 세션 상태 초기화
@@ -764,30 +770,40 @@ if "schedule_requests" not in st.session_state:
 if "editing_req_id" not in st.session_state:
     st.session_state.editing_req_id = None
 
-# 현재 사용자의 휴가/근태 신청 내역 추출
+# 현재 조회 대상(target_user)의 신청 내역 필터링 (이름 또는 ID 기준)
 user_reqs = [
     r
     for r in st.session_state.schedule_requests
-    if r.get("user_name") == target_user
+    if r.get("user_name") == target_user or r.get("user_id") == target_user
 ]
 
 if user_reqs:
-    # 헤더 컬럼 설정
-    req_h1, req_h2, req_h3, req_h4, req_h5 = st.columns(
-        [1.5, 1.5, 2.5, 1.5, 2]
-    )
+    # 헤더 컬럼 설정 (관리자 여부에 따라 테이블 폭 조절)
+    if is_admin:
+        req_h1, req_h2, req_h3, req_h4, req_h5 = st.columns(
+            [1.5, 1.5, 2.5, 1.5, 2]
+        )
+    else:
+        req_h1, req_h2, req_h3, req_h4 = st.columns([1.5, 1.5, 3.5, 1.5])
+
     req_h1.markdown("**신청일자**")
     req_h2.markdown("**구분**")
     req_h3.markdown("**사유**")
     req_h4.markdown("**승인상태**")
-    req_h5.markdown("**관리 (수정/삭제)**")
+    if is_admin:
+        req_h5.markdown("**관리 (수정/삭제)**")
+
     st.markdown(
         "<hr style='margin: 5px 0;'>", unsafe_allow_html=True
     )
 
     for req in user_reqs:
         req_id = req.get("id")
-        rc1, rc2, rc3, rc4, rc5 = st.columns([1.5, 1.5, 2.5, 1.5, 2])
+
+        if is_admin:
+            rc1, rc2, rc3, rc4, rc5 = st.columns([1.5, 1.5, 2.5, 1.5, 2])
+        else:
+            rc1, rc2, rc3, rc4 = st.columns([1.5, 1.5, 3.5, 1.5])
 
         rc1.write(req.get("date", "-"))
         rc2.write(req.get("type", "-"))
@@ -805,135 +821,142 @@ if user_reqs:
             unsafe_allow_html=True,
         )
 
-        # 🛠️ 관리자/사용자 전용 수정 및 삭제 버튼
-        col_edit_btn, col_del_btn = rc5.columns(2)
+        # ---------------------------------------------------------------------
+        # 👑 [관리자 전용] 수정 및 삭제 기능 (일반 사원은 버튼 숨김)
+        # ---------------------------------------------------------------------
+        if is_admin:
+            col_edit_btn, col_del_btn = rc5.columns(2)
 
-        # 1. [✏️ 수정 토글]
-        if col_edit_btn.button("✏️ 수정", key=f"req_edit_btn_{req_id}"):
-            if st.session_state.editing_req_id == req_id:
-                st.session_state.editing_req_id = None
-            else:
-                st.session_state.editing_req_id = req_id
-            st.rerun()
+            # 1. [✏️ 수정 토글]
+            if col_edit_btn.button("✏️ 수정", key=f"req_edit_btn_{req_id}"):
+                if st.session_state.editing_req_id == req_id:
+                    st.session_state.editing_req_id = None
+                else:
+                    st.session_state.editing_req_id = req_id
+                st.rerun()
 
-        # 2. [🗑️ 삭제 처리 및 연차 복구]
-        if col_del_btn.button("🗑️ 삭제", key=f"req_del_btn_{req_id}"):
-            # 승인 완료된 휴가를 삭제하는 경우 차감되었던 연차(1일) 원상복구
-            if status in ["승인", "승인완료"] and "휴가" in req.get(
-                "type", ""
-            ):
-                for u in st.session_state.get("users", []):
-                    if (
-                        u.get("name") == target_user
-                        or u.get("id") == target_user
-                    ):
-                        u["remaining_leave"] = (
-                            float(u.get("remaining_leave", 15.0)) + 1.0
-                        )
-                        st.info(
-                            f"승인 취소로 인해 {target_user}님의 연차 1일이 환급되었습니다."
-                        )
-                        break
+            # 2. [🗑️ 삭제 처리 및 연차 자동 복구]
+            if col_del_btn.button("🗑️ 삭제", key=f"req_del_btn_{req_id}"):
+                # 승인 완료 상태였던 휴가를 관리자가 삭제 시 연차 1일 환급
+                if status in ["승인", "승인완료"] and "휴가" in req.get(
+                    "type", ""
+                ):
+                    for u in st.session_state.get("users", []):
+                        if (
+                            u.get("name") == target_user
+                            or u.get("id") == target_user
+                        ):
+                            u["remaining_leave"] = (
+                                float(u.get("remaining_leave", 15.0)) + 1.0
+                            )
+                            st.info(
+                                f"승인 취소로 인해 [{target_user}]님의 연차 1일이 환급되었습니다."
+                            )
+                            break
 
-            # 내역 목록에서 삭제
-            st.session_state.schedule_requests = [
-                r
-                for r in st.session_state.schedule_requests
-                if r.get("id") != req_id
-            ]
-
-            # vac_requests(시스템관리용) 목록에서도 동시 삭제
-            if "vacation_requests" in st.session_state:
-                st.session_state.vacation_requests = [
+                # 전체 세션(st.session_state.schedule_requests)에서 해당 항목 완전 삭제
+                st.session_state.schedule_requests = [
                     r
-                    for r in st.session_state.vacation_requests
-                    if r.get("id") != req_id
+                    for r in st.session_state.schedule_requests
+                    if str(r.get("id")) != str(req_id)
                 ]
 
-            st.success("신청 내역이 삭제되었습니다.")
-            st.rerun()
+                # 시스템 관리 연차 신청 목록에서도 함께 삭제
+                if "vacation_requests" in st.session_state:
+                    st.session_state.vacation_requests = [
+                        r
+                        for r in st.session_state.vacation_requests
+                        if str(r.get("id")) != str(req_id)
+                    ]
 
-        # ---------------------------------------------------------------------
-        # 📝 [수정 폼] 선택된 항목 바로 아래에 표시
-        # ---------------------------------------------------------------------
-        if st.session_state.editing_req_id == req_id:
-            with st.expander(
-                f"🛠️ [{req.get('date')}] 신청 항목 수정", expanded=True
-            ):
-                with st.form(key=f"edit_form_{req_id}"):
-                    ec1, ec2, ec3 = st.columns([2, 2, 2])
+                st.success("해당 신청 내역이 삭제되었습니다.")
+                st.rerun()
 
-                    new_type = ec1.selectbox(
-                        "구분",
-                        ["연차", "반차", "출장", "외근", "병가", "기타"],
-                        index=0,
-                    )
-                    new_status = ec2.selectbox(
-                        "승인 상태",
-                        ["대기중", "승인완료", "반려"],
-                        index=[
-                            "대기중",
-                            "승인완료",
-                            "승인",
-                            "반려",
-                        ].index(status)
-                        if status in ["대기중", "승인완료", "승인", "반려"]
-                        else 0,
-                    )
-                    new_reason = ec3.text_input(
-                        "사유", value=req.get("reason", "")
-                    )
+            # -----------------------------------------------------------------
+            # 📝 [관리자 전용 수정 폼]
+            # -----------------------------------------------------------------
+            if st.session_state.editing_req_id == req_id:
+                with st.expander(
+                    f"🛠️ [{req.get('date')}] 신청 항목 수정", expanded=True
+                ):
+                    with st.form(key=f"edit_form_{req_id}"):
+                        ec1, ec2, ec3 = st.columns([2, 2, 2])
 
-                    btn_save, btn_cancel = st.columns([1, 1])
+                        new_type = ec1.selectbox(
+                            "구분",
+                            ["연차", "반차", "출장", "외근", "병가", "기타"],
+                            index=0,
+                        )
+                        new_status = ec2.selectbox(
+                            "승인 상태",
+                            ["대기중", "승인완료", "반려"],
+                            index=[
+                                "대기중",
+                                "승인완료",
+                                "승인",
+                                "반려",
+                            ].index(status)
+                            if status in ["대기중", "승인완료", "승인", "반려"]
+                            else 0,
+                        )
+                        new_reason = ec3.text_input(
+                            "사유", value=req.get("reason", "")
+                        )
 
-                    if btn_save.form_submit_button(
-                        "💾 저장하기", type="primary"
-                    ):
-                        old_status = req.get("status")
+                        btn_save = st.form_submit_button(
+                            "💾 저장하기", type="primary"
+                        )
 
-                        # 승인 상태 변화에 따른 연차 자동 계산
-                        # 1) 대기 -> 승인완료 변경 시: 연차 1일 차감
-                        if old_status not in [
-                            "승인",
-                            "승인완료",
-                        ] and new_status in ["승인", "승인완료"]:
-                            for u in st.session_state.get("users", []):
-                                if (
-                                    u.get("name") == target_user
-                                    or u.get("id") == target_user
-                                ):
-                                    u["remaining_leave"] = max(
-                                        0.0,
-                                        float(u.get("remaining_leave", 15.0))
-                                        - 1.0,
-                                    )
-                                    break
+                        if btn_save:
+                            old_status = req.get("status")
 
-                        # 2) 승인완료 -> 반려/대기중 변경 시: 연차 1일 환급
-                        elif old_status in [
-                            "승인",
-                            "승인완료",
-                        ] and new_status not in ["승인", "승인완료"]:
-                            for u in st.session_state.get("users", []):
-                                if (
-                                    u.get("name") == target_user
-                                    or u.get("id") == target_user
-                                ):
-                                    u["remaining_leave"] = (
-                                        float(u.get("remaining_leave", 15.0))
-                                        + 1.0
-                                    )
-                                    break
+                            # 승인 상태 변경에 따른 연차 자동 차감/환급 계산
+                            # 1) 대기중 -> 승인완료 변경 시: 연차 1일 차감
+                            if old_status not in [
+                                "승인",
+                                "승인완료",
+                            ] and new_status in ["승인", "승인완료"]:
+                                for u in st.session_state.get("users", []):
+                                    if (
+                                        u.get("name") == target_user
+                                        or u.get("id") == target_user
+                                    ):
+                                        u["remaining_leave"] = max(
+                                            0.0,
+                                            float(
+                                                u.get("remaining_leave", 15.0)
+                                            )
+                                            - 1.0,
+                                        )
+                                        break
 
-                        # 항목 변경 데이터 업데이트
-                        req["type"] = new_type
-                        req["status"] = new_status
-                        req["reason"] = new_reason
+                            # 2) 승인완료 -> 반려/대기중 변경 시: 연차 1일 환급
+                            elif old_status in [
+                                "승인",
+                                "승인완료",
+                            ] and new_status not in ["승인", "승인완료"]:
+                                for u in st.session_state.get("users", []):
+                                    if (
+                                        u.get("name") == target_user
+                                        or u.get("id") == target_user
+                                    ):
+                                        u["remaining_leave"] = (
+                                            float(
+                                                u.get("remaining_leave", 15.0)
+                                            )
+                                            + 1.0
+                                        )
+                                        break
 
-                        st.session_state.editing_req_id = None
-                        st.success("수정이 완료되었습니다.")
-                        st.rerun()
+                            # 공통 원본 세션 데이터 업데이트
+                            req["type"] = new_type
+                            req["status"] = new_status
+                            req["reason"] = new_reason
 
-                st.markdown("---")
+                            st.session_state.editing_req_id = None
+                            st.success("수정 사항이 저장되었습니다.")
+                            st.rerun()
+
+                    st.markdown("---")
 else:
-    st.info("신청된 휴가 및 근태 내역이 없습니다.")
+    st.info("등록된 휴가 및 근태 신청 내역이 없습니다.")
