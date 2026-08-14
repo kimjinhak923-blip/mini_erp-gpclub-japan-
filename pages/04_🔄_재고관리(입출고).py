@@ -170,11 +170,12 @@ with tab1:
                     ),
                     None,
                 )
+                # 🛠️ KeyError 수정 위치 1: .get()을 활용하여 키가 없을 때도 안전하게 0 처리
                 unit_price = (
-                    custom_p["custom_supply_price"]
+                    custom_p.get("custom_supply_price", 0)
                     if custom_p
                     else (
-                        matched_p["supply_price_jpy"] if matched_p else 0
+                        matched_p.get("supply_price_jpy", matched_p.get("cost_price_krw", matched_p.get("unit_price", 0))) if matched_p else 0
                     )
                 )
                 price_disp = f"¥{unit_price:,.0f}"
@@ -310,8 +311,9 @@ with tab2:
     with col_i1:
         in_qty = st.number_input("입고 수량", min_value=1, value=100)
     with col_i2:
+        # 🛠️ KeyError 수정 위치 2: .get()으로 안전하게 가져오기
         default_cost = (
-            matched_in_p.get("supply_price_jpy", 0) if matched_in_p else 0
+            matched_in_p.get("supply_price_jpy", matched_in_p.get("cost_price_krw", matched_in_p.get("unit_price", 0))) if matched_in_p else 0
         )
         in_unit_cost = st.number_input(
             "매입 단가 (원/엔)", min_value=0, value=default_cost
@@ -490,10 +492,11 @@ with tab3:
                                 ),
                                 None,
                             )
+                            # 🛠️ KeyError 수정 위치 3: .get() 적용
                             unit_price = (
-                                custom_p["custom_supply_price"]
+                                custom_p.get("custom_supply_price", 0)
                                 if custom_p
-                                else matched_p.get("supply_price_jpy", 0)
+                                else matched_p.get("supply_price_jpy", matched_p.get("cost_price_krw", matched_p.get("unit_price", 0)))
                             )
                         else:  # FOC, 샘플 등 무상
                             unit_price = 0
@@ -568,6 +571,5 @@ with tab3:
                     f"총 {success_count}건의 입출고 데이터 업로드가 완료되었습니다! '입출고 이력조회' 페이지에서 확인하실 수 있습니다."
                 )
                 st.rerun()
-
         except Exception as e:
-            st.error(f"엑셀 파일 읽기 및 처리 중 오류가 발생했습니다: {e}")
+            st.error(f"파일 처리 중 오류가 발생했습니다: {e}")
