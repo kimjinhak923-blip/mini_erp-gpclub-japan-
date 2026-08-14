@@ -164,12 +164,12 @@ else:
             st.warning("조건에 해당하는 출고 데이터가 없습니다.")
             
     # -------------------------------------------------------------------------
-    # TAB 2: 거래처별 상세 조회 (드롭다운 선택 및 필터 맞춤 제품 출력)
+    # TAB 2: 거래처별 조회 (JAN코드/상품명/용도별 자동 합산)
     # -------------------------------------------------------------------------
     with tab2:
-        st.subheader("거래처별 출고 제품 상세 조회")
+        st.subheader("🏢 거래처별 출고 및 발주 합산 조회")
 
-        # 1. 거래처 관리 데이터 및 출고 이력 거래처 추출 (None 및 비문자열 안전 제거)
+        # 1. 거래처 목록 추출 (안전 처리)
         registered_clients = [
             str(c.get("name")).strip()
             for c in st.session_state.get("clients", [])
@@ -182,12 +182,10 @@ else:
             if pd.notna(name) and str(name).strip() != ""
         ]
 
-        # 2. 중복 제거 및 문자열 정렬 (TypeError 방지 안전 처리)
         all_client_options = sorted(
             list(set(registered_clients + history_clients))
         )
 
-        # 거래처 선택 드롭다운
         if not all_client_options:
             st.info("등록되거나 출고된 거래처 내역이 없습니다.")
         else:
@@ -198,59 +196,67 @@ else:
             )
 
             if selected_target_client:
-                client_filtered_df = out_df[
+                # 선택한 거래처 데이터 필터링
+                client_df = out_df[
                     out_df["client_name"] == selected_target_client
                 ].copy()
 
-                if not client_filtered_df.empty:
-                    client_filtered_df["date"] = client_filtered_df[
-                        "date"
-                    ].dt.strftime("%Y-%m-%d")
-                    client_filtered_df["qty_fmt"] = client_filtered_df[
-                        "qty"
-                    ].apply(lambda x: f"{int(x):,}")
-                    client_filtered_df["unit_price_fmt"] = client_filtered_df[
-                        "unit_price"
-                    ].apply(lambda x: f"¥{int(x):,}")
-                    client_filtered_df["total_amount_fmt"] = (
-                        client_filtered_df["total_amount"].apply(
-                            lambda x: f"¥{int(x):,}"
-                        )
+                if not client_df.empty:
+                    # 2. JAN코드, 상품명, 용도 기준으로 수량 및 금액 합산 (일자/발주코드 제외)
+                    grouped_client = (
+                        client_df.groupby
+                        (["jan_code", "product_name", "purpose"])[
+                            ["qty", "total_amount"]
+                        ]
+                        .sum()
+                        .reset_index()
                     )
 
-                    # 요약 수치
-                    c_qty = int(client_filtered_df["qty"].sum())
-                    c_amt = int(client_filtered_df["total_amount"].sum())
+                    # 요약 수치 계산
+                    c_qty = int(grouped_client["qty"].sum())
+                    c_amt = int(grouped_client["total_amount"].sum())
 
                     st.markdown(
                         f"**[{selected_target_client}]** 검색 조건 합계: **총 {c_qty:,}개** / **총 발주금액 ¥{c_amt:,}**"
                     )
 
-                    show_client_df = client_filtered_df[
-                        [
-                            "date",
-                            "order_no",
-                            "jan_code",
-                            "product_name",
-                            "purpose",
-                            "qty_fmt",
-                            "unit_price_fmt",
-                            "total_amount_fmt",
-                            "warehouse",
-                        ]
-                    ].rename(
-                        columns={
-                            "date": "일자",
-                            "order_no": "발주코드",
-                            "jan_code": "JAN코드",
-                            "product_name": "상품명",
-                            "purpose": "용도",
-                            "qty_fmt": "수량",
-                            "unit_price_fmt": "단가",
-                            "total_amount_fmt": "발주금액",
-                            "warehouse": "창고",
-                        }
+                    # 3. 용도별 금액 표기 분기 (FOC / 샘플 / 유상)
+                    def format_client_amount(row):
+                        if row["purpose"] == "FOC":
+                            return "FOC (¥0)"
+                        elif row["purpose"] == "샘플":
+                            return "샘플 (¥0)"
+                        else:
+                            return f"¥{int(row['total_amount']):,}"
+
+                    grouped_client["총 발주금액"] = grouped_client.apply(
+                        format_client_amount, axis=1
                     )
+                    grouped_client["총 출고수량"] = grouped_client[
+                        "qty"
+                    ].apply(lambda x: f"{int(x):,} 개")
+
+                    # 4. 표 구성 및 출력
+                    show_client_df = (
+                        grouped_client[
+                            [
+                                "jan_code",
+                                "product_name",
+                                "purpose",
+                                "총 출고수량",
+                                "총 발주금액",
+                            ]
+                        ]
+                        .rename(
+                            columns={
+                                "jan_code": "JAN코드",
+                                "product_name": "상품명",
+                                "purpose": "용도",
+                            }
+                        )
+                        .sort_values(by=["JAN코드", "용도"])
+                    )
+
                     st.dataframe(show_client_df, use_container_width=True)
                 else:
                     st.info(
