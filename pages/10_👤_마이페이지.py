@@ -22,7 +22,6 @@ with col1:
 with col2:
     st.subheader("🌴 근태 및 연차 정보")
     st.write(f"**입사일:** {user.get('hire_date', '미등록')}")
-    st.write(f"**잔여 연차:** {user.get('remaining_leave', 0)} 일")
 
 st.markdown("---")
 st.subheader("🔑 비밀번호 변경")
