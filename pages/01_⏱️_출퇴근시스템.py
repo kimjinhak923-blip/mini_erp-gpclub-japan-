@@ -1,28 +1,32 @@
 import datetime
 import pytz
 import streamlit as st
+from i18n import txt, render_live_clock
 from sidebar_menu import render_sidebar
 
+# ⚠️ 최상단 배치로 Streamlit Cloud Execution Error 방지
 st.set_page_config(page_title="출퇴근시스템", layout="wide")
 
+# 사이드바 렌더링 (로그인 미수행 시 여기서 st.stop())
 render_sidebar()
 
-st.title("⏱️ 출퇴근 시스템")
+st.title(txt("commute_system"))
 st.markdown("---")
 
 tokyo_tz = pytz.timezone("Asia/Tokyo")
 now = datetime.datetime.now(tokyo_tz)
 
-# 사용자 로그인 세션 체크 예시
-if "logged_in_user" not in st.session_state:
-    st.error("로그인이 필요합니다.")
-    st.stop()
-
 user = st.session_state.logged_in_user
-st.subheader(f"👋 {user['name']}님, 오늘 하루도 힘내세요!")
-st.info(f"📅 현재 시각: **{now.strftime('%Y-%m-%d %H:%M:%S')}** (Asia/Tokyo)")
+st.subheader(txt("greeting", name=user['name']))
 
-# 출퇴근 상태 저장을 위한 세션 초기화 예시
+# 상단 실시간 시계 컴포넌트 출력
+col_time1, col_time2 = st.columns([2, 1])
+with col_time1:
+    st.info(f"{txt('current_time_info')}")
+with col_time2:
+    render_live_clock()
+
+# 세션 내 출퇴근 기록 저장용 초기화
 if "clock_in_time" not in st.session_state:
     st.session_state.clock_in_time = None
 if "clock_out_time" not in st.session_state:
@@ -31,20 +35,17 @@ if "clock_out_time" not in st.session_state:
 col1, col2 = st.columns(2)
 
 with col1:
-    if st.button("☀️ 출근하기", use_container_width=True, type="primary"):
+    if st.button(txt("clock_in"), use_container_width=True, type="primary"):
         st.session_state.clock_in_time = now.strftime("%H:%M:%S")
-        # TODO: 데이터베이스(DB)에 출근 기록(user['id'], timestamp) 저장 로직 추가
-        st.success(f"[{st.session_state.clock_in_time}] 출근 처리가 완료되었습니다!")
+        st.success(txt("clock_in_success", time=st.session_state.clock_in_time))
 
 with col2:
-    if st.button("🌙 퇴근하기", use_container_width=True):
+    if st.button(txt("clock_out"), use_container_width=True):
         st.session_state.clock_out_time = now.strftime("%H:%M:%S")
-        # TODO: 데이터베이스(DB)에 퇴근 기록(user['id'], timestamp) 저장 로직 추가
-        st.warning(f"[{st.session_state.clock_out_time}] 퇴근 처리가 완료되었습니다!")
+        st.warning(txt("clock_out_success", time=st.session_state.clock_out_time))
 
-# 오늘 처리된 출퇴근 기록 현황 표시
 st.markdown("---")
-st.subheader("📋 오늘의 기록")
+st.subheader(txt("todays_record"))
 c1, c2 = st.columns(2)
-c1.metric("출근 시간", st.session_state.clock_in_time or "미등록")
-c2.metric("퇴근 시간", st.session_state.clock_out_time or "미등록")
+c1.metric(txt("clock_in_time"), st.session_state.clock_in_time or txt("unregistered"))
+c2.metric(txt("clock_out_time"), st.session_state.clock_out_time or txt("unregistered"))
