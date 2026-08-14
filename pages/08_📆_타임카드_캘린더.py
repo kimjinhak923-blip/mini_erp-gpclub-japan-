@@ -42,7 +42,7 @@ is_admin = (logged_user.get("role") == "admin")
 if "selected_target_user" not in st.session_state:
     st.session_state.selected_target_user = logged_user["name"]
 
-# 연차 데이터
+# 연차 데이터 (기본 부여)
 if "user_vacation_info" not in st.session_state:
     st.session_state.user_vacation_info = {
         "관리자": {"granted": 15.0, "used": 2.0},
@@ -99,18 +99,20 @@ if "schedule_requests" not in st.session_state:
         }
     ]
 
-# 인라인 수정 선택 세션
+# 인라인 수정 및 신청수정 선택 세션
 if "editing_date" not in st.session_state:
     st.session_state.editing_date = None
+if "editing_req_id" not in st.session_state:
+    st.session_state.editing_req_id = None
 
-# 🇯🇵 일본 공휴일 마스터 데이터 연동 (예: 2026년 8월 산의 날 8/11, 대체휴일 8/12 등)
+# 일본 공휴일 마스터 데이터 연동
 JAPAN_HOLIDAYS = [
     "2026-08-11", # 산의 날
     "2026-08-12", # 대체휴무
 ]
 
 # ==========================================
-# 2. ⏱️ 근무/잔업 정밀 계산 로직 (수정됨)
+# 2. ⏱️ 근무/잔업 정밀 계산 로직
 # ==========================================
 def calculate_work_and_overtime(clock_in_str, clock_out_str, manual_break=None, manual_late=None, manual_early=None):
     try:
@@ -125,8 +127,6 @@ def calculate_work_and_overtime(clock_in_str, clock_out_str, manual_break=None, 
 
         total_presence = max(0.0, (t_out - t_in).total_seconds() / 3600.0)
 
-        # [수정된 휴식시간 로직] 
-        # 수동입력값이 양수인 경우 적용, 그렇지 않은 경우 오전 출근 후 12시 이후 퇴근이면 무조건 1.0시간
         if manual_break is not None and manual_break != "" and float(manual_break) > 0:
             break_hours = float(manual_break)
         elif t_in < t_noon and t_out > t_noon:
@@ -191,11 +191,6 @@ target_user = st.session_state.selected_target_user
 # 연차 정보 안전 초기화
 if target_user not in st.session_state.user_vacation_info:
     st.session_state.user_vacation_info[target_user] = {"granted": 15.0, "used": 0.0}
-
-v_info = st.session_state.user_vacation_info[target_user]
-rem_vacation = v_info["granted"] - v_info["used"]
-
-st.caption(f"💡 [{target_user}] 님 연차 현황: 총 부여 `{v_info['granted']}일` | 사용 `{v_info['used']}일` | **잔여 `{rem_vacation}일`**")
 
 # ==========================================
 # 4. ◀️ 이전달 / 다음달 ▶️ 상단 이동 툴바
@@ -338,7 +333,7 @@ with c_act3:
                 st.rerun()
 
 # ==========================================
-# 5. 📊 최상단 월간 근태 통계 요약
+# 5. 📊 최상단 월간 근태 통계 요약 (연차 현황 추가)
 # ==========================================
 weekdays_kr = ["월", "화", "수", "목", "금", "토", "일"]
 _, last_day = calendar.monthrange(year, month)
@@ -365,23 +360,28 @@ for d in range(1, last_day + 1):
         if e_m > 0 or att.get("status") == "조퇴":
             tot_early_c += 1
 
-st.markdown(f"##### 📊 [{target_user}] 님 {year}년 {month}월 근태 통계 요약")
-m1, m2, m3, m4, m5 = st.columns(5)
+v_info = st.session_state.user_vacation_info[target_user]
+rem_vacation = v_info["granted"] - v_info["used"]
+
+st.markdown(f"##### 📊 [{target_user}] 님 {year}년 {month}월 근태 및 연차 통계 요약")
+m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
 m1.metric("총 근무일수", f"{tot_days} 일")
 m2.metric("총 근무시간", f"{tot_work_h:.2f} 시간")
 m3.metric("연장(잔업)시간", f"{tot_over_h:.2f} 시간")
 m4.metric("지각 횟수", f"{tot_late_c} 회")
 m5.metric("조퇴 횟수", f"{tot_early_c} 회")
+m6.metric("사용 연차", f"{v_info['used']} 일")
+m7.metric("잔여 연차", f"{rem_vacation} 일")
 
 # ==========================================
-# 6. 📅 캘린더 뷰
+# 6. 📅 캘린더 뷰 (승인된 연차 자동 반영)
 # ==========================================
 st.markdown("---")
 st.subheader(f"📅 [{target_user}] 님 {year}년 {month}월 캘린더")
 
 cal_mode = st.selectbox(
     "🔄 캘린더 모드 선택",
-    ["1️⃣ 근무 / 근태 확인 캘린더 (출퇴근·근무시간·지각/조퇴)", "2️⃣ 사내 일정 확인 캘린더 (미팅·회의실·업무스케줄)"]
+    ["1️⃣ 근무 / 근태 확인 캘린더 (출퇴근·근무시간·지각/조퇴/휴가)", "2️⃣ 사내 일정 확인 캘린더 (미팅·회의실·업무스케줄·휴가)"]
 )
 
 first_weekday, _ = calendar.monthrange(year, month)
@@ -403,8 +403,19 @@ if "1️⃣" in cal_mode:
             else:
                 curr_d_str = f"{year}-{month:02d}-{day_counter:02d}"
                 att_day = next((a for a in st.session_state.attendance_logs if a["date"] == curr_d_str and a.get("user_name") == target_user), None)
+                approved_vac = next((r for r in st.session_state.schedule_requests if r["date"] == curr_d_str and r.get("user_name") == target_user and r.get("status") == "승인완료"), None)
 
-                if att_day and att_day.get("clock_in") and att_day.get("clock_in") != "-":
+                if approved_vac:
+                    v_type = approved_vac.get("type", "연차/휴가")
+                    v_reason = approved_vac.get("reason", "")
+                    card_html = f"""
+                    <div style="background-color: #FEFCBF; color: #744210; padding: 8px; border-radius: 6px; border: 1px solid #F6E05E; margin-bottom: 5px; font-size: 0.88rem;">
+                        <b style="color: #2D3748; font-size: 0.95rem;">{day_counter}일</b><br>
+                        <span style="font-weight: bold; color: #D69E2E;">🏝️ {v_type}</span><br>
+                        <span style="font-size: 0.8rem; color: #975A16;">({v_reason})</span>
+                    </div>
+                    """
+                elif att_day and att_day.get("clock_in") and att_day.get("clock_in") != "-":
                     w_h, o_h, l_m, e_m, b_h, t_w_h = calculate_work_and_overtime(
                         att_day.get("clock_in"), att_day.get("clock_out"),
                         att_day.get("break_hours"), att_day.get("late_mins"), att_day.get("early_mins")
@@ -459,19 +470,23 @@ else:
             else:
                 curr_d_str = f"{year}-{month:02d}-{day_counter:02d}"
                 sch_day = [s for s in st.session_state.company_schedules if s["date"] == curr_d_str and s.get("category", "기타") in cat_filter]
+                approved_vac = next((r for r in st.session_state.schedule_requests if r["date"] == curr_d_str and r.get("user_name") == target_user and r.get("status") == "승인완료"), None)
 
                 box_content = f"**{day_counter}일**\n\n"
+                if approved_vac:
+                    box_content += f"🏝️ [{approved_vac.get('type')}] {approved_vac.get('reason')}\n"
+                
                 if sch_day:
                     for sch in sch_day:
                         box_content += f"📌 [{sch.get('category')}] {sch['title']} ({sch['time']})\n"
-                else:
+                elif not approved_vac:
                     box_content += "─\n"
 
                 grid_cols[idx].success(box_content)
                 day_counter += 1
 
 # ==========================================
-# 7. 📋 타임카드 테이블
+# 7. 📋 타임카드 테이블 (승인 연차 자동 연결)
 # ==========================================
 st.markdown("---")
 st.subheader(f"📋 [{target_user}] 님 일별 타임카드 상세 내역")
@@ -495,7 +510,7 @@ st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
 for d in range(1, last_day + 1):
     curr_date = datetime.date(year, month, d)
     date_str = curr_date.strftime("%Y-%m-%d")
-    weekday_num = curr_date.weekday() # 0:월 ~ 5:토, 6:일
+    weekday_num = curr_date.weekday()
     
     is_saturday = (weekday_num == 5)
     is_sunday = (weekday_num == 6)
@@ -503,8 +518,15 @@ for d in range(1, last_day + 1):
     is_off_day = is_saturday or is_sunday or is_japan_holiday
 
     att = next((a for a in st.session_state.attendance_logs if a["date"] == date_str and a.get("user_name") == target_user), None)
+    approved_vac = next((r for r in st.session_state.schedule_requests if r["date"] == date_str and r.get("user_name") == target_user and r.get("status") == "승인완료"), None)
 
-    if is_off_day and (not att or not att.get("clock_in") or att.get("clock_in") == "-"):
+    if approved_vac and (not att or not att.get("clock_in") or att.get("clock_in") == "-"):
+        c_in = "-"
+        c_out = "-"
+        stat = approved_vac.get("type", "연차/휴가")
+        note = f"[{stat}] {approved_vac.get('reason', '')}"
+        w_hrs, o_hrs, l_mins, e_mins, b_hrs, tot_w_hrs = 0.0, 0.0, 0, 0, 0.0, 0.0
+    elif is_off_day and (not att or not att.get("clock_in") or att.get("clock_in") == "-"):
         c_in = "-"
         c_out = "-"
         stat = "휴무일"
@@ -517,9 +539,11 @@ for d in range(1, last_day + 1):
         m_late = att.get("late_mins") if att else None
         m_early = att.get("early_mins") if att else None
         
-        default_stat_val = "휴무일" if is_off_day else "미기록"
+        default_stat_val = approved_vac.get("type", "휴무일" if is_off_day else "미기록") if approved_vac else ("휴무일" if is_off_day else "미기록")
         stat = att.get("status", default_stat_val) if att else default_stat_val
-        note = att.get("note", "") if att else ""
+        
+        default_note_val = f"[{stat}] {approved_vac.get('reason', '')}" if approved_vac else ""
+        note = att.get("note", default_note_val) if att else default_note_val
 
         w_hrs, o_hrs, l_mins, e_mins, b_hrs, tot_w_hrs = calculate_work_and_overtime(c_in, c_out, m_break, m_late, m_early)
 
@@ -544,7 +568,9 @@ for d in range(1, last_day + 1):
     c8.write(str(e_mins))
     c9.write(f"{b_hrs:.2f}")
     
-    if stat == "휴무일":
+    if "연차" in stat or "휴가" in stat or "반차" in stat:
+        c10.markdown(f"<span style='color: #D69E2E; font-weight: bold;'>🏷️ {stat}</span>", unsafe_allow_html=True)
+    elif stat == "휴무일":
         c10.markdown(f"<span style='color: #718096; font-weight: bold;'>{stat}</span>", unsafe_allow_html=True)
     else:
         c10.write(stat)
@@ -602,21 +628,31 @@ for d in range(1, last_day + 1):
     is_off_day = (weekday_num in [5, 6]) or (date_str in JAPAN_HOLIDAYS)
     
     att = next((a for a in st.session_state.attendance_logs if a["date"] == date_str and a.get("user_name") == target_user), None)
-    c_in = att.get("clock_in", "-") if att else "-"
-    c_out = att.get("clock_out", "-") if att else "-"
-    m_break = att.get("break_hours") if att else None
-    m_late = att.get("late_mins") if att else None
-    m_early = att.get("early_mins") if att else None
-    
-    default_stat_val = "휴무일" if is_off_day else "미기록"
-    
-    w_hrs, o_hrs, l_mins, e_mins, b_hrs, tot_w_hrs = calculate_work_and_overtime(c_in, c_out, m_break, m_late, m_early)
+    approved_vac = next((r for r in st.session_state.schedule_requests if r["date"] == date_str and r.get("user_name") == target_user and r.get("status") == "승인완료"), None)
+
+    if approved_vac and (not att or not att.get("clock_in") or att.get("clock_in") == "-"):
+        c_in, c_out = "-", "-"
+        stat = approved_vac.get("type", "연차/휴가")
+        note = f"[{stat}] {approved_vac.get('reason', '')}"
+        w_hrs, o_hrs, l_mins, e_mins, b_hrs, tot_w_hrs = 0.0, 0.0, 0, 0, 0.0, 0.0
+    else:
+        c_in = att.get("clock_in", "-") if att else "-"
+        c_out = att.get("clock_out", "-") if att else "-"
+        m_break = att.get("break_hours") if att else None
+        m_late = att.get("late_mins") if att else None
+        m_early = att.get("early_mins") if att else None
+        
+        default_stat_val = "휴무일" if is_off_day else "미기록"
+        stat = att.get("status", default_stat_val) if att else default_stat_val
+        note = att.get("note", "") if att else ""
+
+        w_hrs, o_hrs, l_mins, e_mins, b_hrs, tot_w_hrs = calculate_work_and_overtime(c_in, c_out, m_break, m_late, m_early)
+
     export_list.append({
         "날짜": date_str, "출근시간": c_in, "퇴근시간": c_out,
         "근무시간": w_hrs, "잔업시간": o_hrs, "총근무시간": tot_w_hrs,
         "지각": l_mins, "조퇴": e_mins, "휴식시간": b_hrs,
-        "상태": att.get("status", default_stat_val) if att else default_stat_val,
-        "비고": att.get("note", "") if att else ""
+        "상태": stat, "비고": note
     })
 
 csv_data = pd.DataFrame(export_list).to_csv(index=False).encode('utf-8-sig')
@@ -628,7 +664,7 @@ st.download_button(
 )
 
 # ==========================================
-# 8. 📑 휴가/근태 신청 이력 및 결재 승인
+# 8. 📑 휴가/근태 신청 이력 및 결재 현황 (수정/삭제 추가)
 # ==========================================
 st.markdown("---")
 st.subheader(f"📑 [{target_user}] 님 휴가/근태 신청 이력 및 결재 현황")
@@ -636,13 +672,79 @@ st.subheader(f"📑 [{target_user}] 님 휴가/근태 신청 이력 및 결재 �
 user_reqs = [r for r in st.session_state.schedule_requests if r.get("user_name") == target_user]
 
 if user_reqs:
-    df_reqs = pd.DataFrame(user_reqs)
-    st.dataframe(
-        df_reqs[["date", "type", "reason", "status"]].rename(columns={
-            "date": "신청일자", "type": "구분", "reason": "사유", "status": "승인상태"
-        }),
-        use_container_width=True
-    )
+    req_h1, req_h2, req_h3, req_h4, req_h5 = st.columns([1.5, 1.5, 3, 1.5, 1.5])
+    req_h1.markdown("**신청일자**")
+    req_h2.markdown("**구분**")
+    req_h3.markdown("**사유**")
+    req_h4.markdown("**승인상태**")
+    req_h5.markdown("**관리 (수정/삭제)**")
+    st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
+
+    for req in user_reqs:
+        rc1, rc2, rc3, rc4, rc5 = st.columns([1.5, 1.5, 3, 1.5, 1.5])
+        rc1.write(req["date"])
+        rc2.write(req["type"])
+        rc3.write(req["reason"])
+        
+        status_color = "#D69E2E" if req["status"] == "대기중" else ("#38A169" if req["status"] == "승인완료" else "#E53E3E")
+        rc4.markdown(f"<span style='color: {status_color}; font-weight: bold;'>{req['status']}</span>", unsafe_allow_html=True)
+
+        col_edit_btn, col_del_btn = rc5.columns(2)
+        if col_edit_btn.button("✏️", key=f"req_edit_btn_{req['id']}"):
+            if st.session_state.editing_req_id == req["id"]:
+                st.session_state.editing_req_id = None
+            else:
+                st.session_state.editing_req_id = req["id"]
+            st.rerun()
+
+        if col_del_btn.button("🗑️", key=f"req_del_btn_{req['id']}"):
+            if req["status"] == "승인완료":
+                if "연차" in req["type"] or "휴가" in req["type"]:
+                    st.session_state.user_vacation_info[target_user]["used"] = max(0.0, st.session_state.user_vacation_info[target_user]["used"] - 1.0)
+                elif "반차" in req["type"]:
+                    st.session_state.user_vacation_info[target_user]["used"] = max(0.0, st.session_state.user_vacation_info[target_user]["used"] - 0.5)
+            st.session_state.schedule_requests = [r for r in st.session_state.schedule_requests if r["id"] != req["id"]]
+            st.success("신청 내역이 삭제되었습니다.")
+            st.rerun()
+
+        if st.session_state.editing_req_id == req["id"]:
+            with st.container():
+                st.info(f"🛠️ **[{req['date']}] 근태/휴가 신청 내역 수정**")
+                with st.form(f"form_edit_req_{req['id']}"):
+                    fe_date = st.date_input("신청 날짜", datetime.datetime.strptime(req["date"], "%Y-%m-%d").date())
+                    type_opts = ["연차/휴가", "오전반차", "오후반차", "외출", "조퇴"]
+                    t_idx = type_opts.index(req["type"]) if req["type"] in type_opts else 0
+                    fe_type = st.selectbox("신청 구분", type_opts, index=t_idx)
+                    fe_reason = st.text_area("신청 사유", value=req["reason"])
+                    
+                    if is_admin:
+                        st_opts = ["대기중", "승인완료", "반려"]
+                        s_idx = st_opts.index(req["status"]) if req["status"] in st_opts else 0
+                        fe_status = st.selectbox("승인 상태 (관리자)", st_opts, index=s_idx)
+                    else:
+                        fe_status = req["status"]
+
+                    if st.form_submit_button("💾 수정 저장", type="primary"):
+                        if req["status"] == "승인완료" and fe_status != "승인완료":
+                            if "연차" in req["type"] or "휴가" in req["type"]:
+                                st.session_state.user_vacation_info[target_user]["used"] = max(0.0, st.session_state.user_vacation_info[target_user]["used"] - 1.0)
+                            elif "반차" in req["type"]:
+                                st.session_state.user_vacation_info[target_user]["used"] = max(0.0, st.session_state.user_vacation_info[target_user]["used"] - 0.5)
+                        elif req["status"] != "승인완료" and fe_status == "승인완료":
+                            if "연차" in fe_type or "휴가" in fe_type:
+                                st.session_state.user_vacation_info[target_user]["used"] += 1.0
+                            elif "반차" in fe_type:
+                                st.session_state.user_vacation_info[target_user]["used"] += 0.5
+
+                        req.update({
+                            "date": str(fe_date),
+                            "type": fe_type,
+                            "reason": fe_reason,
+                            "status": fe_status
+                        })
+                        st.session_state.editing_req_id = None
+                        st.success("수정 저장되었습니다.")
+                        st.rerun()
 else:
     st.caption("신청 내역이 없습니다.")
 
@@ -655,7 +757,7 @@ if is_admin:
             col_p1.write(f"📌 **[{p_req['user_name']}]** {p_req['date']} - {p_req['type']} ({p_req['reason']})")
             if col_p2.button("✅ 승인", key=f"app_ok_{p_req['id']}"):
                 p_req["status"] = "승인완료"
-                if "연차" in p_req["type"]:
+                if "연차" in p_req["type"] or "휴가" in p_req["type"]:
                     st.session_state.user_vacation_info[p_req['user_name']]["used"] += 1.0
                 elif "반차" in p_req["type"]:
                     st.session_state.user_vacation_info[p_req['user_name']]["used"] += 0.5
