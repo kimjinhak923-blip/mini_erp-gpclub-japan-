@@ -1,67 +1,61 @@
+import datetime
+import pytz
 import streamlit as st
-from utils.i18n import LANG_MAP_TO_CODE, LANG_MAP_TO_NAME, get_language, txt
-
 
 def render_sidebar():
-    with st.sidebar:
-        current_code = get_language()
-        current_name = LANG_MAP_TO_NAME.get(current_code, "한국어")
+    """공통 사이드바: ERP Main 텍스트 -> 1~10 순서 메뉴 -> 번역 선택 -> 사용자 정보"""
 
-        options = ["한국어", "日本語", "English"]
-        try:
-            default_index = options.index(current_name)
-        except ValueError:
-            default_index = 0
+    # 미로그인 시 메인 페이지로 안전하게 이동 안내
+    if not st.session_state.get("logged_in_user"):
+        st.warning("🔒 로그인이 필요합니다.")
+        if st.button("🔑 로그인 화면으로 이동", type="primary", use_container_width=True):
+            st.switch_page("01_ERP_Main.py")
+        st.stop()
 
-        selected_lang_name = st.selectbox(
-            txt("select_language", "🌐 언어 선택 (Language)"),
-            options=options,
-            index=default_index,
-            key="sidebar_global_language_selectbox",
-        )
+    user = st.session_state.logged_in_user
 
-        selected_code = LANG_MAP_TO_CODE.get(selected_lang_name, "KO")
+    # 1. 최상단: 클릭 불가능한 텍스트 표기
+    st.sidebar.markdown("### 🏢 **ERP Main**")
+    st.sidebar.caption("사내 통합 관리 시스템")
+    st.sidebar.markdown("---")
 
-        if selected_code != current_code:
-            st.session_state["lang"] = selected_code
-            st.session_state["language"] = selected_code
+    # 2. 지정된 1~10번 메뉴 순서
+    st.sidebar.subheader("📌 메뉴")
+    st.sidebar.page_link("pages/01_⏱️_출퇴근시스템.py", label="1. 출퇴근시스템")
+    st.sidebar.page_link("pages/02_📊_대시보드.py", label="2. 대시보드")
+    st.sidebar.page_link("pages/03_💰_매출관리.py", label="3. 매출관리")
+    st.sidebar.page_link("pages/04_📜_입출고_이력_조회.py", label="4. 입출고 이력 조회")
+    st.sidebar.page_link("pages/05_🔄_재고관리(입출고).py", label="5. 재고관리(입출고)")
+    st.sidebar.page_link("pages/06_🤝_거래처_관리.py", label="6. 거래처관리")
+    st.sidebar.page_link("pages/07_📦_마스터상품_관리.py", label="7. 마스터상품관리")
+    st.sidebar.page_link("pages/08_📅_타임카드_캘린더.py", label="8. 타임카드 캘린더")
+    st.sidebar.page_link("pages/09_⚙️_시스템관리.py", label="9. 시스템관리")
+    st.sidebar.page_link("pages/10_🕵️_마이페이지.py", label="10. 마이페이지")
 
-            if "logged_in_user" in st.session_state and isinstance(
-                st.session_state["logged_in_user"], dict
-            ):
-                st.session_state["logged_in_user"]["language"] = selected_code
+    st.sidebar.markdown("---")
 
-            st.rerun()
+    # 3. 메뉴 바로 아래: 번역(언어) 선택기
+    st.sidebar.subheader("🌐 번역 선택 / Language")
+    current_lang = st.session_state.get("lang", "한국어")
+    selected_lang = st.sidebar.selectbox(
+        "언어 선택",
+        ["한국어", "日本語", "English"],
+        index=["한국어", "日本語", "English"].index(current_lang) if current_lang in ["한국어", "日本語", "English"] else 0,
+        label_visibility="collapsed"
+    )
+    if selected_lang != current_lang:
+        st.session_state.lang = selected_lang
+        st.rerun()
 
-        st.markdown("---")
+    st.sidebar.markdown("---")
 
-        user = st.session_state.get("logged_in_user")
-        if user and isinstance(user, dict):
-            st.markdown(
-                f"👤 **{user.get('name', '')}** ({user.get('position', txt('default_position', '사원'))})"
-            )
-            st.caption(
-                f"🔑 {txt('label_role', '권한')}: {user.get('role', txt('default_role', '일반 사용자'))}"
-            )
-            st.markdown("---")
+    # 4. 사용자 정보 & 도쿄 시간 & 로그아웃
+    st.sidebar.markdown(f"👤 **접속자**: {user['name']} ({user.get('position', '사원')})")
+    
+    tokyo_tz = pytz.timezone("Asia/Tokyo")
+    current_tokyo_time = datetime.datetime.now(tokyo_tz).strftime("%Y-%m-%d %H:%M:%S")
+    st.sidebar.caption(f"🕒 도쿄 시간: {current_tokyo_time}")
 
-        st.page_link(
-            "pages/01_⏱️_출퇴근시스템.py",
-            label=txt("menu_commute", "⏱️ 출퇴근 관리 / 타임카드"),
-        )
-        st.page_link(
-            "pages/02_⚙️_시스템관리.py",
-            label=txt("menu_system", "⚙️ 시스템 및 사용자 관리"),
-        )
-        st.page_link(
-            "pages/03_👤_마이페이지.py",
-            label=txt("menu_mypage", "👤 마이페이지"),
-        )
-
-        st.markdown("---")
-
-        if user and st.button(
-            txt("btn_logout", "🚪 로그아웃"), use_container_width=True
-        ):
-            st.session_state["logged_in_user"] = None
-            st.rerun()
+    if st.sidebar.button("🚪 로그아웃", use_container_width=True):
+        st.session_state.logged_in_user = None
+        st.switch_page("01_ERP_Main.py")
