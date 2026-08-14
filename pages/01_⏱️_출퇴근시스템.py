@@ -1,7 +1,7 @@
 import streamlit as st
 
 # ⚠️ 최상단 배치로 Streamlit Cloud Execution Error 방지
-st.set_page_config(page_title="출퇴근시스템", page_layout="wide")
+st.set_page_config(page_title="출퇴근시스템", layout="wide")
 
 import datetime
 import pytz
