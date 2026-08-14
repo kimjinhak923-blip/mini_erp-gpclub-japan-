@@ -1,4 +1,5 @@
 import streamlit as st
+from i18n import txt, render_live_clock  # 공통 다국어 및 실시간 시계 모듈 로드
 
 # ⚠️ page_layout -> layout 으로 파라미터명 수정 완료
 st.set_page_config(
@@ -25,6 +26,7 @@ if "users" not in st.session_state:
             "approved": True,
             "hire_date": "2020-01-01",
             "remaining_leave": 15,
+            "lang": "한국어",  # 기본 언어 설정
         },
         {
             "id": "user1",
@@ -35,6 +37,7 @@ if "users" not in st.session_state:
             "approved": True,
             "hire_date": "2023-03-01",
             "remaining_leave": 12,
+            "lang": "한국어",  # 기본 언어 설정
         },
     ]
 
@@ -106,33 +109,44 @@ if "company_holidays" not in st.session_state:
 
 # --- 로그인 / 회원가입 UI ---
 if not st.session_state.logged_in_user:
-    st.title("🏢 사내 통합 관리 시스템")
+    col_h1, col_h2 = st.columns([3, 1])
+    with col_h1:
+        st.title(txt("system_title"))
+    with col_h2:
+        st.markdown(f"**{txt('live_clock')}**")
+        render_live_clock()
+
     st.markdown("---")
 
     col_l, col_c, col_r = st.columns([1, 2, 1])
     with col_c:
-        st.subheader("🔐 인증 센터")
-        tab_l, tab_s = st.tabs(["로그인", "회원가입"])
+        st.subheader(txt("auth_center"))
+        tab_l, tab_s = st.tabs([txt("login"), txt("signup")])
 
         with tab_l:
-            login_id = st.text_input("사원번호 또는 아이디", key="main_login_id")
-            login_pw = st.text_input("비밀번호", type="password", key="main_login_pw")
-            if st.button("로그인", use_container_width=True, type="primary"):
+            login_id = st.text_input(txt("user_id"), key="main_login_id")
+            login_pw = st.text_input(txt("password"), type="password", key="main_login_pw")
+            if st.button(txt("login"), use_container_width=True, type="primary"):
                 user = next((u for u in st.session_state.users if u["id"] == login_id and u["pw"] == login_pw), None)
                 if user:
                     if not user.get("approved", True):
-                        st.error("아직 관리자 승인이 완료되지 않은 계정입니다.")
+                        st.error(txt("pending_approval"))
                     else:
+                        # 로그인 유저 설정 및 계정 기본 언어로 즉시 전환
                         st.session_state.logged_in_user = user
+                        st.session_state.lang = user.get("lang", "한국어")
                         st.switch_page("pages/01_⏱️_출퇴근시스템.py")
                 else:
-                    st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
+                    st.error(txt("login_fail"))
 
         with tab_s:
             new_id = st.text_input("아이디 (ID)", key="main_su_id")
-            new_pw = st.text_input("비밀번호 (PW)", type="password", key="main_su_pw")
-            new_name = st.text_input("이름 (성명)", key="main_su_name")
-            if st.button("가입 신청", use_container_width=True):
+            new_pw = st.text_input(f"{txt('password')} (PW)", type="password", key="main_su_pw")
+            new_name = st.text_input(txt("name"), key="main_su_name")
+            # 회원가입 시 선호 언어 선택 기능 추가
+            new_lang = st.selectbox(txt("preferred_lang"), ["한국어", "English", "日本語"], key="main_su_lang")
+            
+            if st.button(txt("signup_btn"), use_container_width=True):
                 if new_id and new_pw and new_name:
                     st.session_state.users.append({
                         "id": new_id,
@@ -143,9 +157,12 @@ if not st.session_state.logged_in_user:
                         "approved": False,
                         "hire_date": "2026-01-01",
                         "remaining_leave": 10,
+                        "lang": new_lang,  # 가입 시 선택한 기본 언어 저장
                     })
-                    st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인할 수 있습니다.")
+                    st.success(txt("signup_success"))
                 else:
-                    st.error("모든 항목을 입력해주세요.")
+                    st.error(txt("fill_all"))
 else:
+    # 이미 로그인되어 있다면 계정 언어로 세션 보장 후 이동
+    st.session_state.lang = st.session_state.logged_in_user.get("lang", st.session_state.lang)
     st.switch_page("pages/01_⏱️_출퇴근시스템.py")
