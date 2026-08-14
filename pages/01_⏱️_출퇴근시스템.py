@@ -1,8 +1,15 @@
-import datetime
-import pytz
 import streamlit as st
-from i18n import txt, render_live_clock
 from sidebar_menu import render_sidebar
+from utils.i18n import render_live_clock, txt
+
+# 1. 공통 사이드바 및 언어선택기 호출
+render_sidebar()
+
+# 2. 페이지 헤더 및 실시간 시계
+st.title(txt("menu_commute", "⏱️ 출퇴근 관리 / 타임카드"))
+render_live_clock()
+
+# ... (이하 기존 출퇴근 로직 코드)
 
 # ⚠️ 최상단 배치로 Streamlit Cloud Execution Error 방지
 st.set_page_config(page_title="출퇴근시스템", layout="wide")
