@@ -26,6 +26,7 @@ COLUMN_MAPS = {
         "category": "카테고리",
         "capacity": "용량/규격",
         "cost_price_krw": "매입단가(원)",
+        "list_price_jpy_excl_tax": "소비자 가(엔, 세외)",
         "units_per_box": "BOX 입수량(EA)",
         "single_box_dim": "단상자 규격(W*D*H)",
         "outer_box_dim": "박스 규격(W*D*H)",
@@ -37,6 +38,7 @@ COLUMN_MAPS = {
         "category": "カテゴリー",
         "capacity": "容量/規格",
         "cost_price_krw": "仕入単価(KRW)",
+        "list_price_jpy_excl_tax": "希望小売価格(円・税抜)",
         "units_per_box": "1箱の入数(EA)",
         "single_box_dim": "化粧箱サイズ(W*D*H)",
         "outer_box_dim": "外箱サイズ(W*D*H)",
@@ -48,6 +50,7 @@ COLUMN_MAPS = {
         "category": "Category",
         "capacity": "Capacity",
         "cost_price_krw": "Purchase Price (KRW)",
+        "list_price_jpy_excl_tax": "List Price (JPY, Excl. Tax)",
         "units_per_box": "Units Per Box",
         "single_box_dim": "Single Box Dim(W*D*H)",
         "outer_box_dim": "Outer Box Dim(W*D*H)",
@@ -66,13 +69,15 @@ with tab1:
     if st.session_state.master_products:
         df_p = pd.DataFrame(st.session_state.master_products)
 
-        # 구 버전 데이터 호환성 처리
+        # 구 버전 데이터 호환성 및 신규 칼럼 기본값 처리
         if "jan_code" in df_p.columns and "box_jan_code" not in df_p.columns:
             df_p.rename(columns={"jan_code": "box_jan_code"}, inplace=True)
         if "single_jan_code" not in df_p.columns:
             df_p["single_jan_code"] = "-"
         if "cost_price_krw" not in df_p.columns:
             df_p["cost_price_krw"] = df_p.get("supply_price_jpy", 0)
+        if "list_price_jpy_excl_tax" not in df_p.columns:
+            df_p["list_price_jpy_excl_tax"] = df_p.get("list_price_jpy", 0)
         if "single_box_dim" not in df_p.columns:
             df_p["single_box_dim"] = "-"
         if "outer_box_dim" not in df_p.columns:
@@ -86,6 +91,7 @@ with tab1:
             "category",
             "capacity",
             "cost_price_krw",
+            "list_price_jpy_excl_tax",
             "units_per_box",
             "single_box_dim",
             "outer_box_dim",
@@ -105,6 +111,9 @@ with tab1:
             column_config={
                 "매입단가(원)": st.column_config.NumberColumn(
                     "매입단가(원)", format="₩%d"
+                ),
+                "소비자 가(엔, 세외)": st.column_config.NumberColumn(
+                    "소비자 가(엔, 세외)", format="¥%d"
                 ),
                 "BOX 입수량(EA)": st.column_config.NumberColumn(
                     "BOX 입수량(EA)", format="%d"
@@ -159,6 +168,9 @@ with tab2:
             cost_price_krw = st.number_input(
                 "매입단가(원 ₩)", min_value=0, value=10000, step=500
             )
+            list_price_jpy_excl_tax = st.number_input(
+                "소비자 가 (엔 ¥, VAT 별도)", min_value=0, value=2500, step=100
+            )
 
         with col3:
             units_per_box = st.number_input(
@@ -187,6 +199,7 @@ with tab2:
                     "category": category,
                     "capacity": capacity,
                     "cost_price_krw": cost_price_krw,
+                    "list_price_jpy_excl_tax": list_price_jpy_excl_tax,
                     "units_per_box": units_per_box,
                     "single_box_dim": single_box_dim
                     if single_box_dim
@@ -196,7 +209,7 @@ with tab2:
 
                 st.session_state.master_products.append(new_item)
 
-                # 다른 페이지(재고 관리, 거래처 관리) 공유용 동기화
+                # 다른 페이지 공유용 동기화
                 if "products" not in st.session_state:
                     st.session_state.products = []
                 st.session_state.products.append(new_item)
