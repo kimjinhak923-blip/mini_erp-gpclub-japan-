@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title="대시보드", page_layout="wide")
+st.set_page_config(page_title="대시보드", layout="wide")
 
 import datetime
 import pandas as pd
