@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title="마스터상품 및 집기관리", page_layout="wide")
+st.set_page_config(page_title="마스터상품 및 집기관리", layout="wide")
 
 import pandas as pd
 from sidebar_menu import render_sidebar
