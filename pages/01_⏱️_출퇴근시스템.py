@@ -1,13 +1,12 @@
 import streamlit as st
 
-# ⚠️ 무조건 코드 첫 번째 줄에 위치해야 에러가 발생하지 않습니다.
+# ⚠️ 최상단 배치로 Streamlit Cloud Execution Error 방지
 st.set_page_config(page_title="출퇴근시스템", page_layout="wide")
 
 import datetime
 import pytz
 from sidebar_menu import render_sidebar
 
-# 공통 사이드바 출력
 render_sidebar()
 
 st.title("⏱️ 출퇴근 시스템")
