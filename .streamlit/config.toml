@@ -1,8 +1,10 @@
-[browser]
-gatherUsageStats = false
-
 [server]
+# 브라우저와 웹소켓 연결이 끊겨도 세션을 일정시간 유지
+disconnectTimeout = 86400
+
+# 개발 중 파일 변경으로 인한 자동 리로드 해제 (서버 안정성 상승)
 headless = true
 
-[client]
-showSidebarNavigation = true
+[browser]
+# 백그라운드 탭에서도 연결을 유지 시도
+gatherUsageStats = false
