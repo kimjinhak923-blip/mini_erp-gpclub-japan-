@@ -126,16 +126,12 @@ def init_db():
 
 
 # =============================================================================
-# 🏢 거래처 (Clients) 함수
+# 🏢 거래처 (Clients) 함수 (컬럼 자동 동기화 기능 추가)
 # =============================================================================
-def load_clients():
-    """DB에서 거래처 목록 불러오기"""
-    conn = get_connection()
+def _migrate_clients_table(conn):
+    """기존 DB 데이터 손실 없이 부족한 컬럼을 자동 추가해주는 스키마 동기화 함수"""
     cursor = conn.cursor()
-
-    # 테이블 자동 생성 보장
-    cursor.execute(
-        """
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS clients (
             client_name TEXT PRIMARY KEY,
             business_type TEXT,
@@ -146,8 +142,36 @@ def load_clients():
             address TEXT,
             note TEXT
         )
-    """
-    )
+    ''')
+    
+    # 기존 테이블 컬럼 목록 확인
+    cursor.execute("PRAGMA table_info(clients)")
+    existing_cols = [row[1] for row in cursor.fetchall()]
+    
+    # 누락된 컬럼 자동 추가 (기존 데이터 보존)
+    target_cols = {
+        "business_type": "TEXT",
+        "contact_person": "TEXT",
+        "phone": "TEXT",
+        "email": "TEXT",
+        "postal_code": "TEXT",
+        "address": "TEXT",
+        "note": "TEXT"
+    }
+    
+    for col, col_type in target_cols.items():
+        if col not in existing_cols:
+            try:
+                cursor.execute(f"ALTER TABLE clients ADD COLUMN {col} {col_type}")
+            except Exception:
+                pass
+    conn.commit()
+
+
+def load_clients():
+    """DB에서 거래처 목록 불러오기"""
+    conn = get_connection()
+    _migrate_clients_table(conn)  # 테이블 구조 자동 업데이트
 
     df = pd.read_sql("SELECT * FROM clients", conn)
     conn.close()
@@ -157,23 +181,9 @@ def load_clients():
 def save_clients(clients_list):
     """거래처 목록 저장 (중복 제거 및 안전한 저장)"""
     conn = get_connection()
+    _migrate_clients_table(conn)  # 테이블 구조 자동 업데이트
+    
     cursor = conn.cursor()
-
-    # 테이블 생성 보장
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS clients (
-            client_name TEXT PRIMARY KEY,
-            business_type TEXT,
-            contact_person TEXT,
-            phone TEXT,
-            email TEXT,
-            postal_code TEXT,
-            address TEXT,
-            note TEXT
-        )
-    """
-    )
 
     # 기존 데이터 초기화
     cursor.execute("DELETE FROM clients")
@@ -185,29 +195,25 @@ def save_clients(clients_list):
         if c_name:
             unique_clients[c_name] = client
 
-    # DB 저장 (INSERT OR REPLACE 사용으로 중복 에러 차단)
+    # DB 저장
     for c_name, c in unique_clients.items():
-        cursor.execute(
-            """
+        cursor.execute('''
             INSERT OR REPLACE INTO clients 
             (client_name, business_type, contact_person, phone, email, postal_code, address, note)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                c_name,
-                c.get("business_type", "기타"),
-                c.get("contact_person", "-"),
-                c.get("phone", "-"),
-                c.get("email", "-"),
-                c.get("postal_code", "-"),
-                c.get("address", "-"),
-                c.get("note", "-"),
-            ),
-        )
+        ''', (
+            c_name,
+            c.get("business_type", "기타"),
+            c.get("contact_person", "-"),
+            c.get("phone", "-"),
+            c.get("email", "-"),
+            c.get("postal_code", "-"),
+            c.get("address", "-"),
+            c.get("note", "-")
+        ))
 
     conn.commit()
     conn.close()
-
 
 # =============================================================================
 # 🏷️ 거래처별 공급가(Client Prices) 연동 함수
