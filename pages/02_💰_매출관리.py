@@ -1,4 +1,5 @@
 import streamlit as st
+import db  # 데이터베이스 모듈 불러오기
 
 st.set_page_config(page_title="매출관리", layout="wide")
 
@@ -8,6 +9,9 @@ from sidebar_menu import render_sidebar
 render_sidebar()
 
 user = st.session_state.get("logged_in_user")
+
+# DB 테이블 초기화
+db.init_db()
 
 st.title("💰 매출 현황 및 분석")
 st.markdown("---")
