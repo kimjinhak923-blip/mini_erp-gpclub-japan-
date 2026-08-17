@@ -108,15 +108,20 @@ with tab1:
         mapping_dict["선택"] = "선택"  # 선택 체크박스 칼럼 유지
         df_p_renamed = df_p_filtered.rename(columns=mapping_dict)
 
+        # 현재 언어별 매입단가, 소비자가, 입수량 칼럼명 매핑
+        cost_col = mapping_dict.get("cost_price_krw", "매입단가(원)")
+        list_col = mapping_dict.get("list_price_jpy_excl_tax", "소비자 가(엔, 세외)")
+        unit_col = mapping_dict.get("units_per_box", "BOX 입수량(EA)")
+
         edited_df = st.data_editor(
             df_p_renamed,
             num_rows="dynamic",
             use_container_width=True,
             column_config={
                 "선택": st.column_config.CheckboxColumn("선택", help="삭제할 상품을 체크하세요.", default=False),
-                "매입단가(원)": st.column_config.NumberColumn("매입단가(원)", format="₩%d"),
-                "소비자 가(엔, 세외)": st.column_config.NumberColumn("소비자 가(엔, 세외)", format="¥%d"),
-                "BOX 입수량(EA)": st.column_config.NumberColumn("BOX 입수량(EA)", format="%d"),
+                cost_col: st.column_config.NumberColumn(cost_col, format="₩%,d"),
+                list_col: st.column_config.NumberColumn(list_col, format="¥%,d"),
+                unit_col: st.column_config.NumberColumn(unit_col, format="%,d"),
             },
             key="master_product_editor",
         )
@@ -247,7 +252,7 @@ with tab2:
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# TAB 3: 집기 마스터 & 자산 관리 (수정/삭제 기능 반영)
+# TAB 3: 집기 마스터 & 자산 관리 (수정/삭제 기능 연동 및 천단위 서식 적용)
 # -----------------------------------------------------------------------------
 with tab3:
     st.subheader("🎪 집기 마스터 & 자산 관리")
@@ -361,12 +366,12 @@ with tab3:
             use_container_width=True,
             column_config={
                 "선택": st.column_config.CheckboxColumn("선택", help="삭제할 집기를 체크하세요.", default=False),
-                "최초 제작수량": st.column_config.NumberColumn("최초 제작수량", format="%d"),
-                "출고 누적수량": st.column_config.NumberColumn("출고 누적수량", format="%d", disabled=True),
-                "현재 잔여수량": st.column_config.NumberColumn("현재 잔여수량", format="%d", disabled=True),
-                "총 제작비 (엔)": st.column_config.NumberColumn("총 제작비 (엔)", format="¥%d"),
-                "개당 제작단가 (엔)": st.column_config.NumberColumn("개당 제작단가 (엔)", format="¥%.2f", disabled=True),
-                "잔여 자산가치 (엔)": st.column_config.NumberColumn("잔여 자산가치 (엔)", format="¥%d", disabled=True),
+                "최초 제작수량": st.column_config.NumberColumn("최초 제작수량", format="%,d"),
+                "출고 누적수량": st.column_config.NumberColumn("출고 누적수량", format="%,d", disabled=True),
+                "현재 잔여수량": st.column_config.NumberColumn("현재 잔여수량", format="%,d", disabled=True),
+                "총 제작비 (엔)": st.column_config.NumberColumn("총 제작비 (엔)", format="¥%,d"),
+                "개당 제작단가 (엔)": st.column_config.NumberColumn("개당 제작단가 (엔)", format="¥%,.2f", disabled=True),
+                "잔여 자산가치 (엔)": st.column_config.NumberColumn("잔여 자산가치 (엔)", format="¥%,d", disabled=True),
             },
             key="master_fixture_editor",
         )
