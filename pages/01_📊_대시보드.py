@@ -1,10 +1,14 @@
 import datetime
 import pandas as pd
 import streamlit as st
+import db  # 데이터베이스 모듈 불러오기
 from sidebar_menu import render_sidebar
 
 st.set_page_config(page_title="대시보드", layout="wide")
 render_sidebar()
+
+# DB 테이블 초기화
+db.init_db()
 
 st.title("📊 통합 대시보드 및 매출/출고 분석")
 st.markdown("---")
