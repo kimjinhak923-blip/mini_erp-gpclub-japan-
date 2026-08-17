@@ -6,20 +6,13 @@ from sidebar_menu import render_sidebar
 st.set_page_config(page_title="마스터상품 관리", layout="wide")
 render_sidebar()
 
-# DB 테이블 초기화
+# DB 테이블 및 기본 데이터 초기화
 db.init_db()
 
 st.title("📦 마스터 상품 및 집기 자산 관리")
 st.markdown("---")
 
 lang = st.session_state.get("lang", "한국어")
-
-# 세션 상태 초기화
-if "master_products" not in st.session_state:
-    st.session_state.master_products = []
-
-if "master_fixtures" not in st.session_state:
-    st.session_state.master_fixtures = []
 
 # 다국어 칼럼 맵핑
 COLUMN_MAPS = {
@@ -66,12 +59,16 @@ tab1, tab2, tab3 = st.tabs(
 )
 
 # -----------------------------------------------------------------------------
-# TAB 1: 등록된 상품 마스터 목록 & 삭제 기능
+# TAB 1: 등록된 상품 마스터 목록 & 수정 / 삭제
 # -----------------------------------------------------------------------------
 with tab1:
     st.subheader("등록된 마스터 상품 목록")
-    if st.session_state.master_products:
-        df_p = pd.DataFrame(st.session_state.master_products)
+    
+    # DB에서 최신 상품 마스터 조회
+    master_products = db.load_products()
+
+    if master_products:
+        df_p = pd.DataFrame(master_products)
 
         # 구 버전 데이터 호환성 및 신규 칼럼 기본값 처리
         if "jan_code" in df_p.columns and "box_jan_code" not in df_p.columns:
@@ -79,9 +76,9 @@ with tab1:
         if "single_jan_code" not in df_p.columns:
             df_p["single_jan_code"] = "-"
         if "cost_price_krw" not in df_p.columns:
-            df_p["cost_price_krw"] = df_p.get("supply_price_jpy", 0)
+            df_p["cost_price_krw"] = 0
         if "list_price_jpy_excl_tax" not in df_p.columns:
-            df_p["list_price_jpy_excl_tax"] = df_p.get("list_price_jpy", 0)
+            df_p["list_price_jpy_excl_tax"] = 0
         if "single_box_dim" not in df_p.columns:
             df_p["single_box_dim"] = "-"
         if "outer_box_dim" not in df_p.columns:
@@ -108,7 +105,7 @@ with tab1:
         df_p_filtered = df_p[existing_cols]
 
         # 칼럼명 변경 (다국어)
-        mapping_dict = COLUMN_MAPS.get(lang, COLUMN_MAPS["한국어"])
+        mapping_dict = COLUMN_MAPS.get(lang, COLUMN_MAPS["한국어"]).copy()
         mapping_dict["선택"] = "선택"  # 선택 체크박스 칼럼 유지
         df_p_renamed = df_p_filtered.rename(columns=mapping_dict)
 
@@ -132,10 +129,9 @@ with tab1:
 
         btn_col1, btn_col2, _ = st.columns([1.5, 1.5, 5])
 
-        # 1. 수정사항 저장 버튼
+        # 1. 수정사항 DB 저장 버튼
         with btn_col1:
             if st.button("💾 상품 변경사항 저장", type="primary", use_container_width=True):
-                # '선택' 열 제거 후 저장
                 save_df = edited_df.drop(columns=["선택"], errors="ignore")
 
                 inv_map = {
@@ -144,14 +140,10 @@ with tab1:
                 }
                 saved_records = save_df.rename(columns=inv_map).to_dict("records")
 
-                # jan_code 키 동기화 (타 화면 참조용)
-                for item in saved_records:
-                    item["jan_code"] = item.get("box_jan_code", "")
+                # DB에 전체 저장
+                db.save_products(saved_records)
 
-                st.session_state.master_products = saved_records
-                st.session_state.products = saved_records  # 전체 시스템 공유용 상품 세션 동기화
-
-                st.success("상품 마스터가 성공적으로 저장되었습니다.")
+                st.success("상품 마스터가 DB에 영구 저장되었습니다.")
                 st.rerun()
 
         # 2. 선택 항목 삭제 버튼
@@ -162,7 +154,6 @@ with tab1:
                 if selected_rows.empty:
                     st.warning("삭제할 상품을 목록에서 먼저 체크해 주세요.")
                 else:
-                    # 선택 안 된 행들만 남기기
                     remaining_df = edited_df[edited_df["선택"] == False].drop(columns=["선택"], errors="ignore")
 
                     inv_map = {
@@ -171,11 +162,8 @@ with tab1:
                     }
                     updated_records = remaining_df.rename(columns=inv_map).to_dict("records")
 
-                    for item in updated_records:
-                        item["jan_code"] = item.get("box_jan_code", "")
-
-                    st.session_state.master_products = updated_records
-                    st.session_state.products = updated_records  # 시스템 동기화
+                    # DB 업데이드
+                    db.save_products(updated_records)
 
                     st.success(f"{len(selected_rows)}개 상품이 성공적으로 삭제되었습니다.")
                     st.rerun()
@@ -228,38 +216,33 @@ with tab2:
                 st.error("단상자 JAN 코드와 상품명은 필수 입력 항목입니다.")
             else:
                 new_item = {
-                    "jan_code": box_jan_code,
                     "box_jan_code": box_jan_code,
-                    "single_jan_code": single_jan_code
-                    if single_jan_code
-                    else "-",
+                    "single_jan_code": single_jan_code if single_jan_code else "-",
                     "product_name": product_name,
                     "category": category,
                     "capacity": capacity,
                     "cost_price_krw": cost_price_krw,
                     "list_price_jpy_excl_tax": list_price_jpy_excl_tax,
                     "units_per_box": units_per_box,
-                    "single_box_dim": single_box_dim
-                    if single_box_dim
-                    else "-",
+                    "single_box_dim": single_box_dim if single_box_dim else "-",
                     "outer_box_dim": outer_box_dim if outer_box_dim else "-",
                 }
 
-                st.session_state.master_products.append(new_item)
+                # 기존 상품 목록에 추가 후 DB 저장
+                current_products = db.load_products()
+                current_products.append(new_item)
+                db.save_products(current_products)
 
-                # 다른 페이지 공유용 동기화
-                if "products" not in st.session_state:
-                    st.session_state.products = []
-                st.session_state.products.append(new_item)
-
-                st.success(f"신규 상품 [{product_name}]이(가) 등록되었습니다.")
+                st.success(f"신규 상품 [{product_name}]이(가) DB에 등록되었습니다.")
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# TAB 3: 집기 마스터 & 자산 관리 (제작수량 변경 시 잔여수량 자동 계산 및 반영)
+# TAB 3: 집기 마스터 & 자산 관리 (제작수량 수정 시 실시간 출고량 차감 연동)
 # -----------------------------------------------------------------------------
 with tab3:
     st.subheader("🎪 집기 마스터 & 자산 관리")
+
+    warehouses_list = [w["warehouse_name"] for w in db.load_warehouses()]
 
     with st.form("fix_form"):
         fc1, fc2 = st.columns(2)
@@ -270,28 +253,24 @@ with tab3:
             )
         with fc2:
             f_cost = st.number_input("제작비(엔)", min_value=0, value=500000)
-            f_wh = st.selectbox(
-                "입고 창고명",
-                st.session_state.get(
-                    "warehouses", ["SAGAWA", "L&K", "大吉商事"]
-                ),
-            )
+            f_wh = st.selectbox("입고 창고명", warehouses_list)
 
         if st.form_submit_button("🎪 집기 등록", type="primary"):
             if f_name:
-                unit_c = (
-                    round(f_cost / f_total_qty, 2) if f_total_qty > 0 else 0
-                )
-                st.session_state.master_fixtures.append(
-                    {
-                        "fixture_name": f_name,
-                        "total_qty": f_total_qty,
-                        "warehouse": f_wh,
-                        "total_cost": f_cost,
-                        "unit_cost": unit_c,
-                    }
-                )
-                st.success(f"[{f_name}] 집기가 등록되었습니다.")
+                unit_c = round(f_cost / f_total_qty, 2) if f_total_qty > 0 else 0
+                new_fixture = {
+                    "fixture_name": f_name,
+                    "total_qty": f_total_qty,
+                    "warehouse": f_wh,
+                    "total_cost": f_cost,
+                    "unit_cost": unit_c,
+                }
+                
+                current_fixtures = db.load_fixtures()
+                current_fixtures.append(new_fixture)
+                db.save_fixtures(current_fixtures)
+
+                st.success(f"[{f_name}] 집기가 DB에 등록되었습니다.")
                 st.rerun()
             else:
                 st.error("집기명을 입력해 주세요.")
@@ -299,32 +278,34 @@ with tab3:
     st.markdown("---")
     st.write("##### 📊 집기 자산 및 잔여 현황 (수정/삭제 기능 연동)")
 
-    if st.session_state.master_fixtures:
-        logs = st.session_state.get("stock_logs", [])
-        df_f = pd.DataFrame(st.session_state.master_fixtures)
+    # DB에서 최신 집기 목록과 입출고 로그 가져오기
+    master_fixtures = db.load_fixtures()
+    stock_logs = db.load_stock_logs()
 
-        # 삭제용 체크박스 열 추가
+    if master_fixtures:
+        df_f = pd.DataFrame(master_fixtures)
         df_f["선택"] = False
 
-        # 출고 누적량 및 잔여 현황 자동 계산열 추가
+        # 입출고 로그(stock_logs) 기반으로 출고 누적량 및 잔여 현황 자동 산출
         out_qtys = []
         calc_rem_qtys = []
         rem_values = []
 
         for _, fix in df_f.iterrows():
-            f_n = fix.get("fixture_name", "")
+            f_n = str(fix.get("fixture_name", ""))
             t_q = int(fix.get("total_qty", 0))
             t_c = float(fix.get("total_cost", 0))
 
-            # 재고 로그에서 출고된 누적 수량 계산
+            # 1. 입출고 등록 내역에서 해당 집기의 출고 수량 합산
             out_q = sum(
-                l.get("qty", 0)
-                for l in logs
-                if l.get("product_name") == f_n
-                and l.get("type") == "출고"
-                and l.get("item_category") == "집기"
+                int(l.get("qty", 0))
+                for l in stock_logs
+                if str(l.get("product_name", "")) == f_n
+                and str(l.get("type", "")) == "출고"
+                and str(l.get("item_category", "")) == "집기"
             )
-            # 현재 잔여수량 = 제작수량 - 출고 누적수량
+
+            # 2. 잔여수량 = (최초/수정된 제작수량) - (입출고 등록 내역의 출고 누적수량)
             c_rem_q = max(0, t_q - out_q)
             u_c = round(t_c / t_q, 2) if t_q > 0 else 0
             r_val = round(u_c * c_rem_q, 2)
@@ -337,7 +318,6 @@ with tab3:
         df_f["calc_rem_qty"] = calc_rem_qtys
         df_f["rem_value"] = rem_values
 
-        # 컬럼 순서 정리 및 매핑
         f_target_cols = [
             "선택",
             "fixture_name",
@@ -384,7 +364,7 @@ with tab3:
 
         f_btn_col1, f_btn_col2, _ = st.columns([1.5, 1.5, 5])
 
-        # 1. 집기 수정사항 저장 (제작수량 수정 시 잔여수량 재계산)
+        # 1. 집기 수정사항 저장 (수정된 제작수량 기준 잔여수량 재계산 후 DB 저장)
         with f_btn_col1:
             if st.button("💾 집기 변경사항 저장", type="primary", use_container_width=True):
                 save_f_df = edited_f_df.drop(columns=["선택"], errors="ignore")
@@ -398,7 +378,7 @@ with tab3:
                     tot_q = int(fix.get("total_qty", 0))
                     tot_c = float(fix.get("total_cost", 0))
                     
-                    # 제작수량이 변경되더라도 출고 누적수량과 연동하여 잔여수량 및 자산가치 자동 재계산
+                    # 수량이 변경되면 개당 단가를 재계산하여 리스트 구성
                     u_cost = round(tot_c / tot_q, 2) if tot_q > 0 else 0
 
                     clean_fixtures.append({
@@ -409,8 +389,9 @@ with tab3:
                         "unit_cost": u_cost,
                     })
 
-                st.session_state.master_fixtures = clean_fixtures
-                st.success("집기 마스터가 성공적으로 저장되었으며, 잔여수량 및 가치가 자동 재계산되었습니다.")
+                # DB 저장
+                db.save_fixtures(clean_fixtures)
+                st.success("집기 마스터가 성공적으로 DB에 저장되었습니다. (잔여수량 자동 재계산 완료)")
                 st.rerun()
 
         # 2. 선택한 집기 삭제
@@ -440,7 +421,8 @@ with tab3:
                             "unit_cost": u_cost,
                         })
 
-                    st.session_state.master_fixtures = clean_fixtures
+                    # DB 삭제 반영
+                    db.save_fixtures(clean_fixtures)
                     st.success(f"{len(selected_f_rows)}개 집기가 성공적으로 삭제되었습니다.")
                     st.rerun()
     else:
