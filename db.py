@@ -451,30 +451,36 @@ def load_client_prices():
         
     return client_prices
 
-
-def save_client_prices(client_prices_dict):
-    """거래처별 공급가 데이터를 DB에 저장 (기존 데이터 초기화 후 재등록)"""
+def save_clients(clients_list):
+    """거래처 목록 저장 (중복 제거 및 DB 저장)"""
     conn = get_connection()
     cursor = conn.cursor()
 
-    # 기존 데이터 삭제 후 일괄 재등록
-    cursor.execute("DELETE FROM client_prices")
+    # 1. 기존 데이터 초기화
+    cursor.execute("DELETE FROM clients")
 
-    for client_name, items in client_prices_dict.items():
-        for jan_code, info in items.items():
-            cursor.execute('''
-                INSERT INTO client_prices 
-                (client_name, jan_code, product_name, capacity, list_price, supply_price, supply_rate)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                client_name,
-                jan_code,
-                info.get("product_name", ""),
-                info.get("capacity", "-"),
-                float(info.get("list_price", 0)),
-                float(info.get("supply_price", 0)),
-                float(info.get("supply_rate", 0))
-            ))
+    # 2. 거래처명(client_name) 기준 중복 제거 처리
+    unique_clients = {}
+    for client in clients_list:
+        c_name = client.get("client_name")
+        if c_name:
+            unique_clients[c_name] = client  # 동일 거래처명이 있을 경우 최신 항목으로 덮어씀
+
+    # 3. DB 일괄 저장 (INSERT OR REPLACE 사용으로 중복 오류 방지)
+    for c_name, c in unique_clients.items():
+        cursor.execute('''
+            INSERT OR REPLACE INTO clients 
+            (client_name, business_type, contact_person, phone, email, postal_code, address)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            c_name,
+            c.get("business_type", "기타"),
+            c.get("contact_person", "-"),
+            c.get("phone", "-"),
+            c.get("email", "-"),
+            c.get("postal_code", "-"),
+            c.get("address", "-")
+        ))
 
     conn.commit()
     conn.close()
