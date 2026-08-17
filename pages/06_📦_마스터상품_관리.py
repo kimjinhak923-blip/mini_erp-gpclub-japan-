@@ -247,7 +247,7 @@ with tab2:
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# TAB 3: 집기 마스터 & 자산 관리
+# TAB 3: 집기 마스터 & 자산 관리 (수정/삭제 기능 반영)
 # -----------------------------------------------------------------------------
 with tab3:
     st.subheader("🎪 집기 마스터 & 자산 관리")
@@ -288,44 +288,146 @@ with tab3:
                 st.error("집기명을 입력해 주세요.")
 
     st.markdown("---")
-    st.write("##### 📊 집기 자산 및 잔여 현황 (출고 반영 자동 계산)")
+    st.write("##### 📊 집기 자산 및 잔여 현황 (수정/삭제 기능 연동)")
 
     if st.session_state.master_fixtures:
         logs = st.session_state.get("stock_logs", [])
-        fixtures_display = []
+        df_f = pd.DataFrame(st.session_state.master_fixtures)
 
-        for fix in st.session_state.master_fixtures:
-            f_name = fix["fixture_name"]
-            total_q = fix["total_qty"]
+        # 삭제용 체크박스 열 추가
+        df_f["선택"] = False
 
-            # 출고 이력 중 해당 집기 출고량 차감
+        # 출고 누적량 및 잔여 현황 자동 계산열 추가
+        out_qtys = []
+        calc_rem_qtys = []
+        rem_values = []
+
+        for _, fix in df_f.iterrows():
+            f_n = fix.get("fixture_name", "")
+            t_q = int(fix.get("total_qty", 0))
+            t_c = float(fix.get("total_cost", 0))
+
             out_q = sum(
                 l.get("qty", 0)
                 for l in logs
-                if l.get("product_name") == f_name
+                if l.get("product_name") == f_n
                 and l.get("type") == "출고"
                 and l.get("item_category") == "집기"
             )
-            calc_rem_q = max(0, total_q - out_q)
-            unit_c = fix.get(
-                "unit_cost",
-                round(fix["total_cost"] / total_q, 2) if total_q > 0 else 0,
-            )
-            rem_value = round(unit_c * calc_rem_q, 2)
+            c_rem_q = max(0, t_q - out_q)
+            u_c = round(t_c / t_q, 2) if t_q > 0 else 0
+            r_val = round(u_c * c_rem_q, 2)
 
-            fixtures_display.append(
-                {
-                    "집기명": f_name,
-                    "입고 창고": fix["warehouse"],
-                    "최초 제작수량": f"{total_q:,} 개",
-                    "출고 누적수량": f"{out_q:,} 개",
-                    "현재 잔여수량": f"{calc_rem_q:,} 개",
-                    "총 제작비 (엔)": f"¥{int(fix['total_cost']):,}",
-                    "개당 제작단가 (엔)": f"¥{unit_c:,.2f}",
-                    "잔여 자산가치 (엔)": f"¥{int(rem_value):,}",
-                }
-            )
+            out_qtys.append(out_q)
+            calc_rem_qtys.append(c_rem_q)
+            rem_values.append(r_val)
 
-        st.dataframe(pd.DataFrame(fixtures_display), use_container_width=True)
+        df_f["out_qty"] = out_qtys
+        df_f["calc_rem_qty"] = calc_rem_qtys
+        df_f["rem_value"] = rem_values
+
+        # 컬럼 순서 정리 및 매핑
+        f_target_cols = [
+            "선택",
+            "fixture_name",
+            "warehouse",
+            "total_qty",
+            "out_qty",
+            "calc_rem_qty",
+            "total_cost",
+            "unit_cost",
+            "rem_value",
+        ]
+        existing_f_cols = [c for c in f_target_cols if c in df_f.columns]
+        df_f_filtered = df_f[existing_f_cols]
+
+        f_mapping_dict = {
+            "선택": "선택",
+            "fixture_name": "집기명",
+            "warehouse": "입고 창고",
+            "total_qty": "최초 제작수량",
+            "out_qty": "출고 누적수량",
+            "calc_rem_qty": "현재 잔여수량",
+            "total_cost": "총 제작비 (엔)",
+            "unit_cost": "개당 제작단가 (엔)",
+            "rem_value": "잔여 자산가치 (엔)",
+        }
+
+        df_f_renamed = df_f_filtered.rename(columns=f_mapping_dict)
+
+        edited_f_df = st.data_editor(
+            df_f_renamed,
+            num_rows="dynamic",
+            use_container_width=True,
+            column_config={
+                "선택": st.column_config.CheckboxColumn("선택", help="삭제할 집기를 체크하세요.", default=False),
+                "최초 제작수량": st.column_config.NumberColumn("최초 제작수량", format="%d"),
+                "출고 누적수량": st.column_config.NumberColumn("출고 누적수량", format="%d", disabled=True),
+                "현재 잔여수량": st.column_config.NumberColumn("현재 잔여수량", format="%d", disabled=True),
+                "총 제작비 (엔)": st.column_config.NumberColumn("총 제작비 (엔)", format="¥%d"),
+                "개당 제작단가 (엔)": st.column_config.NumberColumn("개당 제작단가 (엔)", format="¥%.2f", disabled=True),
+                "잔여 자산가치 (엔)": st.column_config.NumberColumn("잔여 자산가치 (엔)", format="¥%d", disabled=True),
+            },
+            key="master_fixture_editor",
+        )
+
+        f_btn_col1, f_btn_col2, _ = st.columns([1.5, 1.5, 5])
+
+        # 1. 집기 수정사항 저장
+        with f_btn_col1:
+            if st.button("💾 집기 변경사항 저장", type="primary", use_container_width=True):
+                save_f_df = edited_f_df.drop(columns=["선택"], errors="ignore")
+
+                inv_f_map = {v: k for k, v in f_mapping_dict.items() if k != "선택"}
+                saved_f_records = save_f_df.rename(columns=inv_f_map).to_dict("records")
+
+                clean_fixtures = []
+                for fix in saved_f_records:
+                    tot_q = int(fix.get("total_qty", 0))
+                    tot_c = float(fix.get("total_cost", 0))
+                    u_cost = round(tot_c / tot_q, 2) if tot_q > 0 else 0
+
+                    clean_fixtures.append({
+                        "fixture_name": str(fix.get("fixture_name", "")),
+                        "total_qty": tot_q,
+                        "warehouse": str(fix.get("warehouse", "")),
+                        "total_cost": tot_c,
+                        "unit_cost": u_cost,
+                    })
+
+                st.session_state.master_fixtures = clean_fixtures
+                st.success("집기 마스터가 성공적으로 저장되었습니다.")
+                st.rerun()
+
+        # 2. 선택한 집기 삭제
+        with f_btn_col2:
+            if st.button("🗑️ 선택한 집기 삭제", type="secondary", use_container_width=True):
+                selected_f_rows = edited_f_df[edited_f_df["선택"] == True]
+
+                if selected_f_rows.empty:
+                    st.warning("삭제할 집기를 목록에서 먼저 체크해 주세요.")
+                else:
+                    remaining_f_df = edited_f_df[edited_f_df["선택"] == False].drop(columns=["선택"], errors="ignore")
+
+                    inv_f_map = {v: k for k, v in f_mapping_dict.items() if k != "선택"}
+                    updated_f_records = remaining_f_df.rename(columns=inv_f_map).to_dict("records")
+
+                    clean_fixtures = []
+                    for fix in updated_f_records:
+                        tot_q = int(fix.get("total_qty", 0))
+                        tot_c = float(fix.get("total_cost", 0))
+                        u_cost = round(tot_c / tot_q, 2) if tot_q > 0 else 0
+
+                        clean_fixtures.append({
+                            "fixture_name": str(fix.get("fixture_name", "")),
+                            "total_qty": tot_q,
+                            "warehouse": str(fix.get("warehouse", "")),
+                            "total_cost": tot_c,
+                            "unit_cost": u_cost,
+                        })
+
+                    st.session_state.master_fixtures = clean_fixtures
+                    st.success(f"{len(selected_f_rows)}개 집기가 성공적으로 삭제되었습니다.")
+                    st.rerun()
     else:
         st.info("등록된 집기 자산이 없습니다.")
