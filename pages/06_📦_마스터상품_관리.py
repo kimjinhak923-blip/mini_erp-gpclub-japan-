@@ -252,7 +252,7 @@ with tab2:
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# TAB 3: 집기 마스터 & 자산 관리 (수정/삭제 기능 연동 및 천단위 서식 적용)
+# TAB 3: 집기 마스터 & 자산 관리 (제작수량 변경 시 잔여수량 자동 계산 및 반영)
 # -----------------------------------------------------------------------------
 with tab3:
     st.subheader("🎪 집기 마스터 & 자산 관리")
@@ -312,6 +312,7 @@ with tab3:
             t_q = int(fix.get("total_qty", 0))
             t_c = float(fix.get("total_cost", 0))
 
+            # 재고 로그에서 출고된 누적 수량 계산
             out_q = sum(
                 l.get("qty", 0)
                 for l in logs
@@ -319,6 +320,7 @@ with tab3:
                 and l.get("type") == "출고"
                 and l.get("item_category") == "집기"
             )
+            # 현재 잔여수량 = 제작수량 - 출고 누적수량
             c_rem_q = max(0, t_q - out_q)
             u_c = round(t_c / t_q, 2) if t_q > 0 else 0
             r_val = round(u_c * c_rem_q, 2)
@@ -378,7 +380,7 @@ with tab3:
 
         f_btn_col1, f_btn_col2, _ = st.columns([1.5, 1.5, 5])
 
-        # 1. 집기 수정사항 저장
+        # 1. 집기 수정사항 저장 (제작수량 수정 시 잔여수량 재계산)
         with f_btn_col1:
             if st.button("💾 집기 변경사항 저장", type="primary", use_container_width=True):
                 save_f_df = edited_f_df.drop(columns=["선택"], errors="ignore")
@@ -388,12 +390,15 @@ with tab3:
 
                 clean_fixtures = []
                 for fix in saved_f_records:
+                    f_n = str(fix.get("fixture_name", ""))
                     tot_q = int(fix.get("total_qty", 0))
                     tot_c = float(fix.get("total_cost", 0))
+                    
+                    # 제작수량이 변경되더라도 출고 누적수량과 연동하여 잔여수량 및 자산가치 자동 재계산
                     u_cost = round(tot_c / tot_q, 2) if tot_q > 0 else 0
 
                     clean_fixtures.append({
-                        "fixture_name": str(fix.get("fixture_name", "")),
+                        "fixture_name": f_n,
                         "total_qty": tot_q,
                         "warehouse": str(fix.get("warehouse", "")),
                         "total_cost": tot_c,
@@ -401,7 +406,7 @@ with tab3:
                     })
 
                 st.session_state.master_fixtures = clean_fixtures
-                st.success("집기 마스터가 성공적으로 저장되었습니다.")
+                st.success("집기 마스터가 성공적으로 저장되었으며, 잔여수량 및 가치가 자동 재계산되었습니다.")
                 st.rerun()
 
         # 2. 선택한 집기 삭제
