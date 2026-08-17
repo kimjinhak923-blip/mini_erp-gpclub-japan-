@@ -139,32 +139,57 @@ with tab1:
     else:
         st.info("등록된 거래처가 없습니다. [거래처 신규 등록] 탭에서 추가해 주세요.")
 
-# 05_🤝_거래처_관리.py 의 TAB 2 등록 부분
-if st.form_submit_button("거래처 등록", type="primary"):
-    if c_name:
-        current_clients = db.load_clients()
-        
-        # 이미 존재하는 거래처명인지 확인
-        existing_names = [c.get("client_name") for c in current_clients]
-        if c_name in existing_names:
-            st.error(f"[{c_name}]은(는) 이미 등록된 거래처입니다. 다른 이름을 사용해주세요.")
-        else:
-            new_client = {
-                "client_name": c_name,
-                "business_type": b_type,
-                "contact_person": c_person,
-                "phone": phone,
-                "email": email,
-                "postal_code": p_code,
-                "address": address,
-            }
-            current_clients.append(new_client)
-            db.save_clients(current_clients)
+# -----------------------------------------------------------------------------
+# TAB 2: 거래처 신규 등록 (StreamlitAPIException 수정 적용)
+# -----------------------------------------------------------------------------
+with tab2:
+    st.subheader("신규 거래처 등록")
 
-            st.success(f"신규 거래처 [{c_name}]이(가) 등록되었습니다.")
-            st.rerun()
-    else:
-        st.warning("거래처명은 필수 입력 항목입니다.")
+    # st.form() 객체를 변수로 할당하여 사용
+    client_form = st.form("add_client_form", clear_on_submit=True)
+    
+    with client_form:
+        c1, c2 = st.columns(2)
+        with c1:
+            c_name = st.text_input("거래처명 *")
+            b_type = st.selectbox(
+                "구분", ["도매", "소매", "온라인", "해외", "기타"]
+            )
+            c_person = st.text_input("담당자명")
+            phone = st.text_input("전화번호")
+        with c2:
+            email = st.text_input("이메일")
+            p_code = st.text_input("우편번호")
+            address = st.text_input("주소")
+
+        # st.form_submit_button 대신 client_form.form_submit_button 사용
+        submitted = client_form.form_submit_button("거래처 등록", type="primary")
+
+    if submitted:
+        if c_name:
+            current_clients = db.load_clients()
+            
+            # 거래처명 중복 확인
+            existing_names = [c.get("client_name") for c in current_clients]
+            if c_name in existing_names:
+                st.error(f"[{c_name}]은(는) 이미 등록된 거래처입니다.")
+            else:
+                new_client = {
+                    "client_name": c_name,
+                    "business_type": b_type,
+                    "contact_person": c_person,
+                    "phone": phone,
+                    "email": email,
+                    "postal_code": p_code,
+                    "address": address,
+                }
+                current_clients.append(new_client)
+                db.save_clients(current_clients)
+
+                st.success(f"신규 거래처 [{c_name}]이(가) 등록되었습니다.")
+                st.rerun()
+        else:
+            st.warning("거래처명은 필수 입력 항목입니다.")
 
 # -----------------------------------------------------------------------------
 # TAB 3: 거래처별 공급가(단가) 및 공급률 설정 (마스터 상품 DB 연동)
