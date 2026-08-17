@@ -484,3 +484,25 @@ def save_clients(clients_list):
 
     conn.commit()
     conn.close()
+
+def init_db():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # 🟢 clients 테이블 생성 구문 보장
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS clients (
+            client_name TEXT PRIMARY KEY,
+            business_type TEXT,
+            contact_person TEXT,
+            phone TEXT,
+            email TEXT,
+            postal_code TEXT,
+            address TEXT
+        )
+    ''')
+
+    # ... (기존 다른 CREATE TABLE 구문들) ...
+
+    conn.commit()
+    conn.close()
