@@ -394,3 +394,87 @@ def save_warehouses(wh_list):
         )
     conn.commit()
     conn.close()
+
+# db.py 내부 init_db() 함수 안에 추가
+def init_db():
+    conn = get_connection() # 기존 DB 연결 함수 사용
+    cursor = conn.cursor()
+    
+    # ... 기존 테이블 생성 코드들 ...
+
+    # 🟢 거래처별 공급가 테이블 생성 추가
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS client_prices (
+            client_name TEXT,
+            jan_code TEXT,
+            product_name TEXT,
+            capacity TEXT,
+            list_price REAL,
+            supply_price REAL,
+            supply_rate REAL,
+            PRIMARY KEY (client_name, jan_code)
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+# =============================================================================
+# 거래처별 공급가(단가) DB 연동 함수
+# =============================================================================
+def load_client_prices():
+    """DB에서 거래처별 공급가 데이터를 불러와 중첩 디렉터리 구조로 반환"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT client_name, jan_code, product_name, capacity, list_price, supply_price, supply_rate FROM client_prices")
+    rows = cursor.fetchall()
+    conn.close()
+
+    # { "거래처명": { "JAN코드": { ... } } } 구조 생성
+    client_prices = {}
+    for r in rows:
+        client_name = r[0]
+        jan_code = r[1]
+        
+        if client_name not in client_prices:
+            client_prices[client_name] = {}
+            
+        client_prices[client_name][jan_code] = {
+            "jan_code": jan_code,
+            "product_name": r[2],
+            "capacity": r[3],
+            "list_price": r[4],
+            "supply_price": r[5],
+            "supply_rate": r[6],
+        }
+        
+    return client_prices
+
+
+def save_client_prices(client_prices_dict):
+    """거래처별 공급가 데이터를 DB에 저장 (기존 데이터 초기화 후 재등록)"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # 기존 데이터 삭제 후 일괄 재등록
+    cursor.execute("DELETE FROM client_prices")
+
+    for client_name, items in client_prices_dict.items():
+        for jan_code, info in items.items():
+            cursor.execute('''
+                INSERT INTO client_prices 
+                (client_name, jan_code, product_name, capacity, list_price, supply_price, supply_rate)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                client_name,
+                jan_code,
+                info.get("product_name", ""),
+                info.get("capacity", "-"),
+                float(info.get("list_price", 0)),
+                float(info.get("supply_price", 0)),
+                float(info.get("supply_rate", 0))
+            ))
+
+    conn.commit()
+    conn.close()
