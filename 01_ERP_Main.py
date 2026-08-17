@@ -124,7 +124,7 @@ if not st.session_state.logged_in_user:
                         st.error("아직 관리자 승인이 완료되지 않은 계정입니다.")
                     else:
                         st.session_state.logged_in_user = user
-                        st.switch_page("pages/01_⏱️_출퇴근시스템.py")
+                        st.switch_page("pages/01_📊_대시보드.py")
                 else:
                     st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
 
