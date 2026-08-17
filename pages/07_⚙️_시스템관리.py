@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+import db  # 데이터베이스 모듈 불러오기
 from sidebar_menu import render_sidebar
 from utils.i18n import txt
 
@@ -7,6 +8,9 @@ st.set_page_config(page_title="시스템관리", layout="wide")
 render_sidebar()
 
 user = st.session_state.get("logged_in_user")
+
+# DB 테이블 초기화
+db.init_db()
 
 st.title("⚙️ 시스템 및 사용자 관리")
 st.markdown("---")
