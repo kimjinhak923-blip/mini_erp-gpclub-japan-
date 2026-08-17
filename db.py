@@ -5,7 +5,8 @@ DB_FILE = "app_data.db"
 
 
 def get_connection():
-    return sqlite3.connect(DB_FILE, check_same_thread=False)
+    """SQLite DB 커넥션 생성 (타임아웃 10초 설정으로 database locked 예방)"""
+    return sqlite3.connect(DB_FILE, timeout=10, check_same_thread=False)
 
 
 def init_db():
@@ -13,17 +14,16 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # 1. 거래처 마스터
+    # 1. 거래처 마스터 (통합 테이블)
     cursor.execute(
         """
-        CREATE TABLE IF NOT EXISTS master_clients (
-            client_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            client_code TEXT UNIQUE,
-            client_name TEXT NOT NULL,
-            client_type TEXT,
+        CREATE TABLE IF NOT EXISTS clients (
+            client_name TEXT PRIMARY KEY,
+            business_type TEXT,
             contact_person TEXT,
             phone TEXT,
             email TEXT,
+            postal_code TEXT,
             address TEXT,
             note TEXT
         )
@@ -75,15 +75,15 @@ def init_db():
     """
     )
 
-    # 5. 입출고 및 재고 이동 로그 (전체 입출고 등록 내역)
+    # 5. 입출고 및 재고 이동 로그
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS stock_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT,
-            type TEXT,            -- 입고 / 출고 / 이동 등
-            item_category TEXT,   -- 상품 / 집기
-            client_name TEXT,     -- 거래처명
+            type TEXT,          -- 입고 / 출고 / 이동 등
+            item_category TEXT,  -- 상품 / 집기
+            client_name TEXT,    -- 거래처명
             product_name TEXT,
             warehouse TEXT,
             qty INTEGER,
@@ -105,47 +105,206 @@ def init_db():
     """
     )
 
+    # 7. 거래처별 전용 단가/공급가 테이블
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS client_prices (
+            client_name TEXT,
+            jan_code TEXT,
+            product_name TEXT,
+            capacity TEXT,
+            list_price REAL,
+            supply_price REAL,
+            supply_rate REAL,
+            PRIMARY KEY (client_name, jan_code)
+        )
+    """
+    )
+
     conn.commit()
     conn.close()
 
 
 # =============================================================================
-# 거래처 (Clients) 함수
+# 🏢 거래처 (Clients) 함수
 # =============================================================================
 def load_clients():
+    """DB에서 거래처 목록 불러오기"""
     conn = get_connection()
-    df = pd.read_sql("SELECT * FROM master_clients", conn)
+    cursor = conn.cursor()
+
+    # 테이블 자동 생성 보장
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS clients (
+            client_name TEXT PRIMARY KEY,
+            business_type TEXT,
+            contact_person TEXT,
+            phone TEXT,
+            email TEXT,
+            postal_code TEXT,
+            address TEXT,
+            note TEXT
+        )
+    """
+    )
+
+    df = pd.read_sql("SELECT * FROM clients", conn)
     conn.close()
     return df.to_dict("records")
 
 
-def save_clients(client_list):
+def save_clients(clients_list):
+    """거래처 목록 저장 (중복 제거 및 안전한 저장)"""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM master_clients")
-    for c in client_list:
+
+    # 테이블 생성 보장
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS clients (
+            client_name TEXT PRIMARY KEY,
+            business_type TEXT,
+            contact_person TEXT,
+            phone TEXT,
+            email TEXT,
+            postal_code TEXT,
+            address TEXT,
+            note TEXT
+        )
+    """
+    )
+
+    # 기존 데이터 초기화
+    cursor.execute("DELETE FROM clients")
+
+    # 거래처명(client_name) 기준 중복 제거
+    unique_clients = {}
+    for client in clients_list:
+        c_name = client.get("client_name")
+        if c_name:
+            unique_clients[c_name] = client
+
+    # DB 저장 (INSERT OR REPLACE 사용으로 중복 에러 차단)
+    for c_name, c in unique_clients.items():
         cursor.execute(
             """
-            INSERT INTO master_clients (client_code, client_name, client_type, contact_person, phone, email, address, note)
+            INSERT OR REPLACE INTO clients 
+            (client_name, business_type, contact_person, phone, email, postal_code, address, note)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
-                c.get("client_code", ""),
-                c.get("client_name", ""),
-                c.get("client_type", "매장"),
-                c.get("contact_person", ""),
-                c.get("phone", ""),
-                c.get("email", ""),
-                c.get("address", ""),
-                c.get("note", ""),
+                c_name,
+                c.get("business_type", "기타"),
+                c.get("contact_person", "-"),
+                c.get("phone", "-"),
+                c.get("email", "-"),
+                c.get("postal_code", "-"),
+                c.get("address", "-"),
+                c.get("note", "-"),
             ),
         )
+
     conn.commit()
     conn.close()
 
 
 # =============================================================================
-# 거래처별 등록 제품 (Client Products) 함수
+# 🏷️ 거래처별 공급가(Client Prices) 연동 함수
+# =============================================================================
+def load_client_prices():
+    """DB에서 거래처별 공급가 데이터를 불러와 중첩 디렉터리 구조로 반환"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # 테이블 생성 보장
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS client_prices (
+            client_name TEXT,
+            jan_code TEXT,
+            product_name TEXT,
+            capacity TEXT,
+            list_price REAL,
+            supply_price REAL,
+            supply_rate REAL,
+            PRIMARY KEY (client_name, jan_code)
+        )
+    """
+    )
+
+    cursor.execute(
+        "SELECT client_name, jan_code, product_name, capacity, list_price, supply_price, supply_rate FROM client_prices"
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    # { "거래처명": { "JAN코드": { ... } } } 구조로 파싱
+    client_prices = {}
+    for r in rows:
+        c_name, jan_code = r[0], r[1]
+        if c_name not in client_prices:
+            client_prices[c_name] = {}
+
+        client_prices[c_name][jan_code] = {
+            "jan_code": jan_code,
+            "product_name": r[2],
+            "capacity": r[3],
+            "list_price": r[4],
+            "supply_price": r[5],
+            "supply_rate": r[6],
+        }
+
+    return client_prices
+
+
+def save_client_prices(client_prices_dict):
+    """거래처별 공급가 데이터를 DB에 전체 저장"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS client_prices (
+            client_name TEXT,
+            jan_code TEXT,
+            product_name TEXT,
+            capacity TEXT,
+            list_price REAL,
+            supply_price REAL,
+            supply_rate REAL,
+            PRIMARY KEY (client_name, jan_code)
+        )
+    """
+    )
+
+    cursor.execute("DELETE FROM client_prices")
+
+    for client_name, items in client_prices_dict.items():
+        for jan_code, info in items.items():
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO client_prices 
+                (client_name, jan_code, product_name, capacity, list_price, supply_price, supply_rate)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    client_name,
+                    jan_code,
+                    info.get("product_name", ""),
+                    info.get("capacity", "-"),
+                    float(info.get("list_price", 0)),
+                    float(info.get("supply_price", 0)),
+                    float(info.get("supply_rate", 0)),
+                ),
+            )
+
+    conn.commit()
+    conn.close()
+
+
+# =============================================================================
+# 📦 거래처별 등록 제품 (Client Products) 함수
 # =============================================================================
 def load_client_products(client_name=None):
     conn = get_connection()
@@ -184,7 +343,7 @@ def save_client_products(client_product_list):
 
 
 # =============================================================================
-# 상품 (Products) 함수
+# 🎁 상품 (Products) 함수
 # =============================================================================
 def load_products():
     conn = get_connection()
@@ -224,7 +383,7 @@ def save_products(products_list):
 
 
 # =============================================================================
-# 집기 (Fixtures) 함수
+# 🪑 집기 (Fixtures) 함수
 # =============================================================================
 def load_fixtures():
     conn = get_connection()
@@ -256,7 +415,7 @@ def save_fixtures(fixtures_list):
 
 
 # =============================================================================
-# 입출고 로그 및 재고 현황 (Stock Logs & Stock Inventory) 함수
+# 📊 입출고 로그 및 재고 현황 (Stock Logs & Stock Inventory) 함수
 # =============================================================================
 def load_stock_logs():
     conn = get_connection()
@@ -355,7 +514,7 @@ def get_current_stock():
 
 
 # =============================================================================
-# 창고 (Warehouses) 함수
+# 🏬 창고 (Warehouses) 함수
 # =============================================================================
 def load_warehouses():
     conn = get_connection()
@@ -392,117 +551,5 @@ def save_warehouses(wh_list):
                 w.get("manager", "-"),
             ),
         )
-    conn.commit()
-    conn.close()
-
-# db.py 내부 init_db() 함수 안에 추가
-def init_db():
-    conn = get_connection() # 기존 DB 연결 함수 사용
-    cursor = conn.cursor()
-    
-    # ... 기존 테이블 생성 코드들 ...
-
-    # 🟢 거래처별 공급가 테이블 생성 추가
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS client_prices (
-            client_name TEXT,
-            jan_code TEXT,
-            product_name TEXT,
-            capacity TEXT,
-            list_price REAL,
-            supply_price REAL,
-            supply_rate REAL,
-            PRIMARY KEY (client_name, jan_code)
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
-
-# =============================================================================
-# 거래처별 공급가(단가) DB 연동 함수
-# =============================================================================
-def load_client_prices():
-    """DB에서 거래처별 공급가 데이터를 불러와 중첩 디렉터리 구조로 반환"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT client_name, jan_code, product_name, capacity, list_price, supply_price, supply_rate FROM client_prices")
-    rows = cursor.fetchall()
-    conn.close()
-
-    # { "거래처명": { "JAN코드": { ... } } } 구조 생성
-    client_prices = {}
-    for r in rows:
-        client_name = r[0]
-        jan_code = r[1]
-        
-        if client_name not in client_prices:
-            client_prices[client_name] = {}
-            
-        client_prices[client_name][jan_code] = {
-            "jan_code": jan_code,
-            "product_name": r[2],
-            "capacity": r[3],
-            "list_price": r[4],
-            "supply_price": r[5],
-            "supply_rate": r[6],
-        }
-        
-    return client_prices
-
-def save_clients(clients_list):
-    """거래처 목록 저장 (중복 제거 및 DB 저장)"""
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    # 1. 기존 데이터 초기화
-    cursor.execute("DELETE FROM clients")
-
-    # 2. 거래처명(client_name) 기준 중복 제거 처리
-    unique_clients = {}
-    for client in clients_list:
-        c_name = client.get("client_name")
-        if c_name:
-            unique_clients[c_name] = client  # 동일 거래처명이 있을 경우 최신 항목으로 덮어씀
-
-    # 3. DB 일괄 저장 (INSERT OR REPLACE 사용으로 중복 오류 방지)
-    for c_name, c in unique_clients.items():
-        cursor.execute('''
-            INSERT OR REPLACE INTO clients 
-            (client_name, business_type, contact_person, phone, email, postal_code, address)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            c_name,
-            c.get("business_type", "기타"),
-            c.get("contact_person", "-"),
-            c.get("phone", "-"),
-            c.get("email", "-"),
-            c.get("postal_code", "-"),
-            c.get("address", "-")
-        ))
-
-    conn.commit()
-    conn.close()
-
-def init_db():
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    # 🟢 clients 테이블 생성 구문 보장
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS clients (
-            client_name TEXT PRIMARY KEY,
-            business_type TEXT,
-            contact_person TEXT,
-            phone TEXT,
-            email TEXT,
-            postal_code TEXT,
-            address TEXT
-        )
-    ''')
-
-    # ... (기존 다른 CREATE TABLE 구문들) ...
-
     conn.commit()
     conn.close()
