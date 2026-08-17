@@ -10,6 +10,24 @@ render_sidebar()
 # DB 테이블 초기화
 db.init_db()
 
+# --- 데이터베이스 및 세션 상태 자동 연동 ---
+if "stock_logs" not in st.session_state:
+    st.session_state.stock_logs = (
+        db.get_stock_logs() if hasattr(db, "get_stock_logs") else []
+    )
+if "products" not in st.session_state:
+    st.session_state.products = (
+        db.get_products() if hasattr(db, "get_products") else []
+    )
+if "clients" not in st.session_state:
+    st.session_state.clients = (
+        db.get_clients() if hasattr(db, "get_clients") else []
+    )
+if "warehouses" not in st.session_state:
+    st.session_state.warehouses = (
+        db.get_warehouses() if hasattr(db, "get_warehouses") else []
+    )
+
 st.title("📊 통합 대시보드 및 매출/출고 분석")
 st.markdown("---")
 
@@ -21,27 +39,54 @@ if not logs:
     )
 else:
     df = pd.DataFrame(logs)
-    df["date"] = pd.to_datetime(df["date"])
+
+    # --- 데이터 연동 및 타입 안정성 보장 ---
+    required_cols = {
+        "date": datetime.date.today().strftime("%Y-%m-%d"),
+        "type": "출고",
+        "item_category": "제품",
+        "purpose": "납품",
+        "product_name": "",
+        "jan_code": "",
+        "qty": 0,
+        "total_amount": 0,
+        "warehouse": "",
+        "client_name": "",
+    }
+    for col, default_val in required_cols.items():
+        if col not in df.columns:
+            df[col] = default_val
+
+    # 날짜 및 수치형 변환 (문자열 포함 대비)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["qty"] = pd.to_numeric(df["qty"], errors="coerce").fillna(0)
+    df["total_amount"] = pd.to_numeric(df["total_amount"], errors="coerce").fillna(0)
+    df["client_name"] = df["client_name"].fillna("").astype(str)
+    df["product_name"] = df["product_name"].fillna("").astype(str)
+    df["purpose"] = df["purpose"].fillna("").astype(str)
+    df["jan_code"] = df["jan_code"].fillna("").astype(str)
+    df["warehouse"] = df["warehouse"].fillna("").astype(str)
 
     # --- 상단 필터 영역 ---
     st.subheader("🔍 통합 검색 및 조건 필터")
     f_col1, f_col2, f_col3, f_col4 = st.columns(4)
 
+    valid_dates = df["date"].dropna()
     with f_col1:
         min_date = (
-            df["date"].min().date() if not df.empty else datetime.date.today()
+            valid_dates.min().date() if not valid_dates.empty else datetime.date.today()
         )
         max_date = (
-            df["date"].max().date() if not df.empty else datetime.date.today()
+            valid_dates.max().date() if not valid_dates.empty else datetime.date.today()
         )
         date_range = st.date_input("기간 선택", [min_date, max_date])
 
     with f_col2:
-        clients = ["전체"] + list(df["client_name"].unique())
+        clients = ["전체"] + sorted([c for c in df["client_name"].unique() if c])
         sel_client = st.selectbox("거래처 선택", clients)
 
     with f_col3:
-        products = ["전체"] + list(df["product_name"].unique())
+        products = ["전체"] + sorted([p for p in df["product_name"].unique() if p])
         sel_product = st.selectbox("상품 선택", products)
 
     with f_col4:
@@ -90,7 +135,7 @@ else:
 
     st.markdown("---")
 
-    # --- 상세 현황 탭 (요청사항 반영) ---
+    # --- 상세 현황 탭 ---
     tab1, tab2, tab3, tab4 = st.tabs(
         [
             "🛒 전체 출고 내역 및 통합 집계",
@@ -100,13 +145,12 @@ else:
         ]
     )
 
-# -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # TAB 1: 전체 출고 내역 및 통합 집계 (JAN코드/상품명/용도별 자동 합산)
     # -------------------------------------------------------------------------
     with tab1:
         st.subheader("전체 출고 내역 및 통합 집계")
 
-        # 검색조건 기준 전체 총 출고량 및 발주금액
         total_out_qty = int(out_df["qty"].sum())
         total_out_amount = int(out_df["total_amount"].sum())
 
@@ -117,7 +161,6 @@ else:
         )
 
         if not out_df.empty:
-            # 1. JAN코드, 상품명, 용도 기준으로 수량 및 금액 자동 합산
             grouped_tab1 = (
                 out_df.groupby(["jan_code", "product_name", "purpose"])[
                     ["qty", "total_amount"]
@@ -126,7 +169,6 @@ else:
                 .reset_index()
             )
 
-            # 2. 용도별 금액 표기 분기 처리 (FOC / 샘플 / 유상 납품)
             def format_grouped_amount(row):
                 if row["purpose"] == "FOC":
                     return "FOC (¥0)"
@@ -142,7 +184,6 @@ else:
                 lambda x: f"{int(x):,} 개"
             )
 
-            # 3. 테이블 출력 컬럼 정리 및 정렬
             show_tab1 = (
                 grouped_tab1[
                     [
@@ -166,14 +207,13 @@ else:
             st.dataframe(show_tab1, use_container_width=True)
         else:
             st.warning("조건에 해당하는 출고 데이터가 없습니다.")
-            
+
     # -------------------------------------------------------------------------
     # TAB 2: 거래처별 조회 (JAN코드/상품명/용도별 자동 합산)
     # -------------------------------------------------------------------------
     with tab2:
         st.subheader("🏢 거래처별 출고 및 발주 합산 조회")
 
-        # 1. 거래처 목록 추출 (안전 처리)
         registered_clients = [
             str(c.get("name")).strip()
             for c in st.session_state.get("clients", [])
@@ -200,23 +240,19 @@ else:
             )
 
             if selected_target_client:
-                # 선택한 거래처 데이터 필터링
                 client_df = out_df[
                     out_df["client_name"] == selected_target_client
                 ].copy()
 
                 if not client_df.empty:
-                    # 2. JAN코드, 상품명, 용도 기준으로 수량 및 금액 합산 (일자/발주코드 제외)
                     grouped_client = (
-                        client_df.groupby
-                        (["jan_code", "product_name", "purpose"])[
+                        client_df.groupby(["jan_code", "product_name", "purpose"])[
                             ["qty", "total_amount"]
                         ]
                         .sum()
                         .reset_index()
                     )
 
-                    # 요약 수치 계산
                     c_qty = int(grouped_client["qty"].sum())
                     c_amt = int(grouped_client["total_amount"].sum())
 
@@ -224,7 +260,6 @@ else:
                         f"**[{selected_target_client}]** 검색 조건 합계: **총 {c_qty:,}개** / **총 발주금액 ¥{c_amt:,}**"
                     )
 
-                    # 3. 용도별 금액 표기 분기 (FOC / 샘플 / 유상)
                     def format_client_amount(row):
                         if row["purpose"] == "FOC":
                             return "FOC (¥0)"
@@ -240,7 +275,6 @@ else:
                         "qty"
                     ].apply(lambda x: f"{int(x):,} 개")
 
-                    # 4. 표 구성 및 출력
                     show_client_df = (
                         grouped_client[
                             [
@@ -268,7 +302,7 @@ else:
                     )
 
     # -------------------------------------------------------------------------
-    # TAB 3: 상품별 출고 현황 (기존 기능 유지 및 포맷팅)
+    # TAB 3: 상품별 출고 현황
     # -------------------------------------------------------------------------
     with tab3:
         st.subheader("상품별 출고 및 매출 집계")
@@ -301,12 +335,11 @@ else:
             st.info("출고 내역이 없습니다.")
 
     # -------------------------------------------------------------------------
-    # TAB 4: 창고별 재고 및 재고 평가액 (신규 - 시스템 관리 창고 자동 연동)
+    # TAB 4: 창고별 재고 및 재고 평가액
     # -------------------------------------------------------------------------
     with tab4:
         st.subheader("🏭 창고별 실시간 재고량 및 재고 평가액")
 
-        # 1. 시스템 관리에서 등록된 창고 목록 가져오기 (기본값 설정)
         default_warehouses = ["SAGAWA", "L&K", "大吉商事"]
         registered_wh = st.session_state.get(
             "warehouses", default_warehouses
@@ -314,31 +347,27 @@ else:
         if not registered_wh:
             registered_wh = default_warehouses
 
-        # 2. 상품 마스터에서 매입 단가(cost_price) 가져오기
         product_master = st.session_state.get("products", [])
         cost_map = {}
         for p in product_master:
-            code = p.get("jan_code") or p.get("product_code")
-            if code:
-                try:
-                    cost_map[code] = float(
-                        p.get("cost_price", p.get("purchase_price", 0))
-                    )
-                except (ValueError, TypeError):
-                    cost_map[code] = 0.0
+            if isinstance(p, dict):
+                code = p.get("jan_code") or p.get("product_code")
+                if code:
+                    try:
+                        cost_map[str(code)] = float(
+                            p.get("cost_price", p.get("purchase_price", 0))
+                        )
+                    except (ValueError, TypeError):
+                        cost_map[str(code)] = 0.0
 
-        # 3. 입출고 이력(df)을 기반으로 창고별/상품별 재고 자동 계산
-        # 전체 이력을 기준으로 창고별 재고 계산 (필터링된 범위 내 상품 기준)
-        all_logs_df = pd.DataFrame(logs)
+        all_logs_df = df.copy()
 
-        # 상품 및 검색어 필터 조건 적용 (필터에 맞는 상품만 보기)
         if sel_product != "전체":
             all_logs_df = all_logs_df[
                 all_logs_df["product_name"] == sel_product
             ]
 
         if not all_logs_df.empty:
-            # 입고는 (+), 출고는 (-)
             all_logs_df["calc_qty"] = all_logs_df.apply(
                 lambda r: r["qty"] if r["type"] == "입고" else -r["qty"],
                 axis=1,
@@ -352,7 +381,6 @@ else:
                 .reset_index()
             )
 
-            # 창고별 탭 구별 또는 창고별 섹션 표시
             for wh in registered_wh:
                 st.markdown(f"#### 📦 [{wh}] 창고 재고 현황")
                 wh_stock = stock_summary[
@@ -360,15 +388,13 @@ else:
                 ].copy()
 
                 if not wh_stock.empty:
-                    # 매입단가 및 재고 금액 계산
                     wh_stock["cost_price"] = wh_stock["jan_code"].map(
-                        lambda c: cost_map.get(c, 0)
+                        lambda c: cost_map.get(str(c), 0.0)
                     )
                     wh_stock["stock_value"] = (
                         wh_stock["calc_qty"] * wh_stock["cost_price"]
                     )
 
-                    # 요약 합계
                     total_wh_qty = int(wh_stock["calc_qty"].sum())
                     total_wh_val = int(wh_stock["stock_value"].sum())
 
@@ -376,7 +402,6 @@ else:
                         f"보유 수량: **{total_wh_qty:,}개** | 재고 평가액합계: **¥{total_wh_val:,}**"
                     )
 
-                    # 포맷팅
                     wh_stock["calc_qty"] = wh_stock["calc_qty"].apply(
                         lambda x: f"{int(x):,}"
                     )
