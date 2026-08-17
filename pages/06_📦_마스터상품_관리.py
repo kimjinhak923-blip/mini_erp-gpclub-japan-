@@ -1,9 +1,13 @@
 import pandas as pd
 import streamlit as st
+import db  # 데이터베이스 모듈 불러오기
 from sidebar_menu import render_sidebar
 
 st.set_page_config(page_title="마스터상품 관리", layout="wide")
 render_sidebar()
+
+# DB 테이블 초기화
+db.init_db()
 
 st.title("📦 마스터 상품 및 집기 자산 관리")
 st.markdown("---")
