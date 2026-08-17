@@ -1,6 +1,7 @@
 import datetime
 import io
 import pandas as pd
+import db  # 데이터베이스 모듈 불러오기
 from sidebar_menu import render_sidebar
 import streamlit as st
 
@@ -8,6 +9,9 @@ st.set_page_config(page_title="재고관리(입출고)", layout="wide")
 
 render_sidebar()
 user = st.session_state.get("logged_in_user")
+
+# DB 테이블 초기화
+db.init_db()
 
 st.title("📦 재고 입출고 및 출고 등록")
 st.markdown("---")
